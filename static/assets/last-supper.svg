@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg class="art-svg" viewBox="0 0 920 265" xmlns="http://www.w3.org/2000/svg">
+    <path d="M44,196 Q460,189 876,196 L884,248 Q460,253 36,248 Z" fill="none" stroke="#ccc" stroke-width="1" opacity="0.6"></path>
+    <rect x="44" y="193" width="832" height="8" rx="3" fill="none" stroke="#111" stroke-width="2"></rect>
+    <line x1="82" y1="201" x2="70" y2="248" stroke="#111" stroke-width="1.8"></line>
+    <line x1="838" y1="201" x2="850" y2="248" stroke="#111" stroke-width="1.8"></line>
+    <line x1="280" y1="201" x2="276" y2="248" stroke="#111" stroke-width="1.2" opacity="0.35"></line>
+    <line x1="640" y1="201" x2="644" y2="248" stroke="#111" stroke-width="1.2" opacity="0.35"></line>
+    <ellipse cx="96" cy="191" rx="13" ry="4" fill="white" stroke="#111" stroke-width="1.5"></ellipse>
+    <ellipse cx="183" cy="191" rx="13" ry="4" fill="white" stroke="#111" stroke-width="1.5"></ellipse>
+    <ellipse cx="268" cy="191" rx="13" ry="4" fill="white" stroke="#111" stroke-width="1.5"></ellipse>
+    <ellipse cx="354" cy="191" rx="13" ry="4" fill="white" stroke="#111" stroke-width="1.5"></ellipse>
+    <ellipse cx="418" cy="191" rx="13" ry="4" fill="white" stroke="#111" stroke-width="1.5"></ellipse>
+    <ellipse cx="460" cy="190" rx="17" ry="5" fill="white" stroke="#111" stroke-width="2"></ellipse>
+    <ellipse cx="502" cy="191" rx="13" ry="4" fill="white" stroke="#111" stroke-width="1.5"></ellipse>
+    <ellipse cx="566" cy="191" rx="13" ry="4" fill="white" stroke="#111" stroke-width="1.5"></ellipse>
+    <ellipse cx="652" cy="191" rx="13" ry="4" fill="white" stroke="#111" stroke-width="1.5"></ellipse>
+    <ellipse cx="737" cy="191" rx="13" ry="4" fill="white" stroke="#111" stroke-width="1.5"></ellipse>
+    <ellipse cx="824" cy="191" rx="13" ry="4" fill="white" stroke="#111" stroke-width="1.5"></ellipse>
+    <g stroke="#111" stroke-width="1.5" fill="white">
+      <path d="M136,188 L141,179 L147,179 L152,188Z"></path><line x1="144" y1="179" x2="144" y2="176"></line><ellipse cx="144" cy="175" rx="4" ry="1.5"></ellipse>
+      <path d="M308,188 L313,179 L319,179 L324,188Z"></path><line x1="316" y1="179" x2="316" y2="176"></line><ellipse cx="316" cy="175" rx="4" ry="1.5"></ellipse>
+      <path d="M596,188 L601,179 L607,179 L612,188Z"></path><line x1="604" y1="179" x2="604" y2="176"></line><ellipse cx="604" cy="175" rx="4" ry="1.5"></ellipse>
+      <path d="M776,188 L781,179 L787,179 L792,188Z"></path><line x1="784" y1="179" x2="784" y2="176"></line><ellipse cx="784" cy="175" rx="4" ry="1.5"></ellipse>
+    </g>
+    <line x1="460" y1="54" x2="460" y2="45" stroke="#F5C518" stroke-width="2.5"></line>
+    <line x1="489" y1="62" x2="495" y2="54" stroke="#F5C518" stroke-width="2"></line>
+    <line x1="431" y1="62" x2="425" y2="54" stroke="#F5C518" stroke-width="2"></line>
+    <line x1="504" y1="76" x2="511" y2="70" stroke="#F5C518" stroke-width="1.5"></line>
+    <line x1="416" y1="76" x2="409" y2="70" stroke="#F5C518" stroke-width="1.5"></line>
+    <circle cx="460" cy="99" r="42" fill="none" stroke="#F5C518" stroke-width="2.5" stroke-dasharray="7,4"></circle>
+    <circle cx="460" cy="99" r="25" fill="white" stroke="#111" stroke-width="2.5"></circle>
+    <circle cx="452" cy="96" r="2.5" fill="#111"></circle>
+    <circle cx="468" cy="96" r="2.5" fill="#111"></circle>
+    <path d="M452,106 Q460,112 468,106" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round"></path>
+    <text x="460" y="88" text-anchor="middle" font-size="9" font-weight="800" fill="#F5C518" font-family="Arial,sans-serif">A</text>
+    <path d="M437,124 Q460,133 483,124 L477,192 L443,192 Z" fill="white" stroke="#111" stroke-width="2"></path>
+    <path d="M437,139 Q400,130 368,142" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round"></path>
+    <path d="M483,139 Q520,130 552,142" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round"></path>
+    <circle cx="366" cy="143" r="5" fill="white" stroke="#111" stroke-width="1.5"></circle>
+    <circle cx="554" cy="143" r="5" fill="white" stroke="#111" stroke-width="1.5"></circle>
+    <circle cx="375" cy="121" r="19" fill="white" stroke="#111" stroke-width="2"></circle>
+    <circle cx="369" cy="118" r="2" fill="#111"></circle>
+    <circle cx="381" cy="118" r="2" fill="#111"></circle>
+    <path d="M370,128 Q375,131 380,128" fill="none" stroke="#111" stroke-width="1.5" stroke-linecap="round"></path>
+    <path d="M357,140 Q375,148 393,140 L388,192 L362,192 Z" fill="white" stroke="#111" stroke-width="1.5"></path>
+    <path d="M393,152 Q415,143 432,148" fill="none" stroke="#111" stroke-width="1.5" stroke-linecap="round"></path>
+    <path d="M357,152 L342,167" fill="none" stroke="#111" stroke-width="1.5" stroke-linecap="round"></path>
+    <circle cx="285" cy="124" r="18" fill="white" stroke="#111" stroke-width="2"></circle>
+    <circle cx="279" cy="121" r="1.8" fill="#111"></circle>
+    <circle cx="291" cy="121" r="1.8" fill="#111"></circle>
+    <path d="M280,130 Q285,133 290,130" fill="none" stroke="#111" stroke-width="1.5" stroke-linecap="round"></path>
+    <path d="M268,142 Q285,150 302,142 L298,192 L272,192 Z" fill="white" stroke="#111" stroke-width="1.5"></path>
+    <path d="M302,154 Q330,146 352,151" fill="none" stroke="#111" stroke-width="1.5" stroke-linecap="round"></path>
+    <path d="M268,154 L250,162" fill="none" stroke="#111" stroke-width="1.5" stroke-linecap="round"></path>
+    <circle cx="198" cy="125" r="18" fill="white" stroke="#111" stroke-width="2"></circle>
+    <circle cx="192" cy="122" r="1.8" fill="#111"></circle>
+    <circle cx="204" cy="122" r="1.8" fill="#111"></circle>
+    <path d="M193,131 Q198,134 203,131" fill="none" stroke="#111" stroke-width="1.5" stroke-linecap="round"></path>
+    <path d="M181,143 Q198,151 215,143 L211,192 L185,192 Z" fill="white" stroke="#111" stroke-width="1.5"></path>
+    <path d="M181,154 L165,167" fill="none" stroke="#111" stroke-width="1.5" stroke-linecap="round"></path>
+    <path d="M215,154 L230,164" fill="none" stroke="#111" stroke-width="1.5" stroke-linecap="round"></path>
+    <circle cx="108" cy="127" r="17" fill="white" stroke="#111" stroke-width="2"></circle>
+    <circle cx="103" cy="124" r="1.8" fill="#111"></circle>
+    <circle cx="114" cy="124" r="1.8" fill="#111"></circle>
+    <path d="M104,133 Q108,136 113,133" fill="none" stroke="#111" stroke-width="1.5" stroke-linecap="round"></path>
+    <path d="M92,145 Q108,152 124,145 L121,192 L95,192 Z" fill="white" stroke="#111" stroke-width="1.5"></path>
+    <path d="M92,153 L76,135" fill="none" stroke="#111" stroke-width="1.5" stroke-linecap="round"></path>
+    <circle cx="74" cy="133" r="4" fill="white" stroke="#111" stroke-width="1.5"></circle>
+    <path d="M124,153 L137,163" fill="none" stroke="#111" stroke-width="1.5" stroke-linecap="round"></path>
+    <circle cx="545" cy="121" r="19" fill="white" stroke="#111" stroke-width="2"></circle>
+    <circle cx="539" cy="118" r="2" fill="#111"></circle>
+    <circle cx="551" cy="118" r="2" fill="#111"></circle>
+    <path d="M540,128 Q545,131 550,128" fill="none" stroke="#111" stroke-width="1.5" stroke-linecap="round"></path>
+    <path d="M527,140 Q545,148 563,140 L558,192 L532,192 Z" fill="white" stroke="#111" stroke-width="1.5"></path>
+    <path d="M527,152 Q505,143 488,148" fill="none" stroke="#111" stroke-width="1.5" stroke-linecap="round"></path>
+    <path d="M563,152 L578,167" fill="none" stroke="#111" stroke-width="1.5" stroke-linecap="round"></path>
+    <circle cx="635" cy="124" r="18" fill="white" stroke="#111" stroke-width="2"></circle>
+    <circle cx="629" cy="121" r="1.8" fill="#111"></circle>
+    <circle cx="641" cy="121" r="1.8" fill="#111"></circle>
+    <path d="M630,130 Q635,133 640,130" fill="none" stroke="#111" stroke-width="1.5" stroke-linecap="round"></path>
+    <path d="M618,142 Q635,150 652,142 L648,192 L622,192 Z" fill="white" stroke="#111" stroke-width="1.5"></path>
+    <path d="M618,154 Q590,146 568,151" fill="none" stroke="#111" stroke-width="1.5" stroke-linecap="round"></path>
+    <path d="M652,154 L670,162" fill="none" stroke="#111" stroke-width="1.5" stroke-linecap="round"></path>
+    <circle cx="722" cy="125" r="18" fill="white" stroke="#111" stroke-width="2"></circle>
+    <circle cx="716" cy="122" r="1.8" fill="#111"></circle>
+    <circle cx="728" cy="122" r="1.8" fill="#111"></circle>
+    <path d="M717,131 Q722,134 727,131" fill="none" stroke="#111" stroke-width="1.5" stroke-linecap="round"></path>
+    <path d="M705,143 Q722,151 739,143 L735,192 L709,192 Z" fill="white" stroke="#111" stroke-width="1.5"></path>
+    <path d="M705,154 L690,167" fill="none" stroke="#111" stroke-width="1.5" stroke-linecap="round"></path>
+    <path d="M739,154 L754,164" fill="none" stroke="#111" stroke-width="1.5" stroke-linecap="round"></path>
+    <circle cx="812" cy="127" r="17" fill="white" stroke="#111" stroke-width="2"></circle>
+    <circle cx="807" cy="124" r="1.8" fill="#111"></circle>
+    <circle cx="818" cy="124" r="1.8" fill="#111"></circle>
+    <path d="M808,133 Q812,136 817,133" fill="none" stroke="#111" stroke-width="1.5" stroke-linecap="round"></path>
+    <path d="M796,145 Q812,152 828,145 L825,192 L799,192 Z" fill="white" stroke="#111" stroke-width="1.5"></path>
+    <path d="M828,153 L844,135" fill="none" stroke="#111" stroke-width="1.5" stroke-linecap="round"></path>
+    <circle cx="846" cy="133" r="4" fill="white" stroke="#111" stroke-width="1.5"></circle>
+    <path d="M796,153 L782,163" fill="none" stroke="#111" stroke-width="1.5" stroke-linecap="round"></path>
+    <text x="460" y="257" text-anchor="middle" font-size="8" font-weight="800" fill="#F5C518" font-family="Arial,sans-serif" letter-spacing="4">ALAIDIN</text>
+  </svg>

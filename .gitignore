@@ -1,0 +1,19 @@
+# Dependencies
+react/node_modules/
+
+# Build output
+_deploy/
+
+# Runtime
+logs/
+config/
+
+# Mac
+.DS_Store
+._*
+*.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo

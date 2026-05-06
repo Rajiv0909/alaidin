@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Alaidin Buddies — You're Invited</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@800;900&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--y:#F5C518;--k:#111;--g:#666;--w:#fff;--cream:#FAFAF8;--hair:#e8e8e8}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--w);color:var(--k);min-height:100vh}
+
+    /* NAV */
+    nav{display:flex;align-items:center;justify-content:space-between;padding:14px clamp(16px,4vw,48px);border-bottom:2px solid var(--k)}
+    .brand{display:flex;align-items:center;gap:12px}
+    .brand img{height:56px;width:auto;display:block}
+    .brand .surface{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:3px;color:var(--g);padding-left:12px;border-left:1px solid var(--hair)}
+    .nav-tag{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:var(--g)}
+
+    /* HERO */
+    .hero{text-align:center;padding:clamp(32px,6vw,64px) 20px clamp(28px,5vw,48px);border-bottom:1px solid var(--hair);max-width:1040px;margin:0 auto}
+    .eyebrow{display:inline-block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:2.5px;background:var(--y);color:var(--k);padding:5px 16px;border-radius:2px;margin-bottom:20px}
+    .hero h1{font-size:clamp(28px,5.5vw,64px);font-weight:800;line-height:1.03;letter-spacing:-2px;margin-bottom:18px}
+    .hero h1 em{font-style:normal;border-bottom:6px solid var(--y)}
+    .hero-sub{font-size:clamp(14px,1.6vw,18px);color:var(--g);max-width:620px;margin:0 auto;line-height:1.65}
+
+    /* ART */
+    .art-wrap{background:var(--cream);border-top:1px solid #e8e0d8;border-bottom:2px solid var(--k);padding:clamp(28px,5vw,56px) 16px clamp(20px,3vw,32px);text-align:center}
+    .art-svg{max-width:1080px;width:100%;display:block;margin:0 auto;height:auto}
+    .art-cap{font-size:11px;text-transform:uppercase;letter-spacing:3px;color:#aaa;margin-top:16px}
+
+    /* STEPS BAR */
+    .steps-bar{display:flex;justify-content:center;align-items:center;padding:22px 20px;border-bottom:1px solid var(--hair);background:var(--cream)}
+    .si{display:flex;align-items:center;gap:8px;font-size:12px;color:#bbb;font-weight:700;text-transform:uppercase;letter-spacing:1px;flex-shrink:0}
+    .si.active{color:var(--k)}.si.done{color:var(--g)}
+    .sn{width:28px;height:28px;border-radius:50%;border:2px solid #ddd;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;background:var(--w)}
+    .si.active .sn{background:var(--y);border-color:var(--y)}
+    .si.done .sn{background:var(--k);border-color:var(--k);color:var(--w)}
+    .ss{width:40px;height:1px;background:#ddd;margin:0 10px}
+    @media(max-width:540px){.si .label{display:none}.ss{width:20px;margin:0 6px}}
+
+    /* CONTENT */
+    .content{max-width:1100px;margin:0 auto;padding:clamp(32px,5vw,64px) clamp(16px,4vw,40px) 80px}
+    .slabel{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:2.5px;color:var(--g);margin-bottom:22px;padding-bottom:10px;border-bottom:1px solid var(--hair);display:flex;justify-content:space-between;align-items:baseline}
+    .slabel small{font-weight:500;font-size:11px;color:#bbb;letter-spacing:.5px;text-transform:none}
+
+    /* STEP VISIBILITY */
+    #step-login,#step-strategy,#step-capital,#step-done{display:none}
+    #step-login.on,#step-strategy.on,#step-capital.on,#step-done.on{display:block}
+
+    /* LOGIN */
+    .login-box{border:2px solid var(--k);border-radius:3px;padding:clamp(40px,6vw,72px) clamp(32px,5vw,64px);text-align:center;max-width:600px;margin:0 auto;background:var(--cream)}
+    .login-box h2{font-size:clamp(26px,4vw,42px);font-weight:800;letter-spacing:-1.5px;margin-bottom:14px}
+    .login-box .sub{font-size:16px;color:var(--g);line-height:1.65;margin-bottom:36px;max-width:460px;margin-left:auto;margin-right:auto}
+    .login-buttons{display:flex;flex-direction:column;gap:12px;max-width:400px;margin:0 auto}
+    .login-note{margin-top:24px;font-size:12px;color:#bbb;line-height:1.7}
+
+    /* BUTTONS */
+    .btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:15px 24px;border-radius:3px;font-size:14px;font-weight:700;border:2px solid transparent;cursor:pointer;transition:opacity .15s;width:100%;font-family:inherit;text-transform:uppercase;letter-spacing:.5px;text-decoration:none}
+    .btn:hover{opacity:.85}.btn:disabled{opacity:.3;cursor:not-allowed}
+    .btn-p{background:var(--k);color:var(--w);border-color:var(--k)}
+    .btn-k{background:var(--y);color:var(--k);border-color:var(--y)}
+    .btn-b{background:var(--w);color:var(--k);border-color:var(--k)}
+    .btn-g{background:transparent;border-color:#ddd;color:var(--g)}
+    .btn-g:hover{border-color:#bbb;color:var(--k)}
+
+    /* STRATEGY GRID */
+    .sgrid{display:grid;gap:16px;margin-bottom:28px}
+    @media(min-width:780px){.sgrid{grid-template-columns:repeat(2,1fr)}}
+    .sc{border:2px solid var(--hair);border-radius:3px;padding:24px;cursor:pointer;background:var(--w);position:relative;transition:border-color .15s,background .15s;display:flex;flex-direction:column}
+    .sc:hover{border-color:#bbb}
+    .sc.selected{border-color:var(--k);background:var(--cream)}
+    .sc.selected::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--y);border-radius:3px 0 0 3px}
+    .sc.status-live{background:#f0fdf4;border-left:4px solid #16a34a}
+    .sc.status-shadow,.sc.status-testing{background:#fffbeb;border-left:4px solid #d97706}
+    .sc.status-disabled{background:#f5f5f5;border-left:4px solid #d1d5db;opacity:.6;cursor:default;pointer-events:none}
+    .sc.selected.status-live,.sc.selected.status-shadow,.sc.selected.status-testing{background:var(--cream);border-left:4px solid var(--y);opacity:1}
+    .sc-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+    .cbadge{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--g);display:flex;align-items:center;gap:5px}
+    .live-dot{width:6px;height:6px;background:#16a34a;border-radius:50%;animation:pulse 2s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+    .shadow-dot{width:6px;height:6px;background:#d97706;border-radius:50%}
+    .cname{font-size:clamp(18px,2vw,22px);font-weight:800;letter-spacing:-.5px;margin-bottom:6px}
+    .rec-cap-inline{display:inline-block;font-size:11px;font-weight:700;background:var(--y);color:var(--k);padding:2px 8px;border-radius:2px;margin-bottom:12px;align-self:flex-start}
+    .cdesc{font-size:13px;color:var(--g);line-height:1.6;margin-bottom:18px;flex:1}
+    .day-bars-label{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:#bbb;margin-bottom:6px}
+    .day-bars{display:flex;gap:2px;align-items:flex-end;height:22px;margin-bottom:14px}
+    .db{width:4px;border-radius:1px;min-height:4px;flex:0 0 auto}
+    .db.pos{background:#16a34a}.db.neg{background:#ef4444}
+    .cstats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;border-top:1px solid #f0f0f0;padding-top:14px}
+    @media(max-width:400px){.cstats{grid-template-columns:repeat(3,1fr)}}
+    .sv{font-size:15px;font-weight:800;letter-spacing:-.5px}
+    .sv.g{color:#16a34a}.sv.r{color:#ef4444}.sv.b{font-size:17px}
+    .sl{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--g);margin-top:2px;line-height:1.3}
+    .sgrid-actions{display:flex;justify-content:flex-end;margin-top:4px}
+    .sgrid-actions .btn{max-width:280px}
+
+    /* PROPOSE CARD */
+    .sc-propose{border:2px dashed #d4a800;border-radius:3px;padding:28px 24px;cursor:pointer;background:#fff;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center}
+    .sc-propose:hover{background:#fffdf0;border-color:var(--y)}
+    .sc-propose h3{font-size:18px;font-weight:800;letter-spacing:-.3px;margin:10px 0 6px}
+    .sc-propose p{font-size:13px;color:var(--g);line-height:1.55;margin-bottom:16px}
+    .btn-propose{display:inline-block;padding:9px 22px;background:var(--y);color:var(--k);border:2px solid var(--y);border-radius:3px;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.3px}
+
+    /* CHAT PANEL */
+    #chat-panel{max-height:0;overflow:hidden;transition:max-height .35s ease;border:2px solid var(--k);border-radius:3px;margin-bottom:16px;background:#fff}
+    #chat-panel.open{max-height:660px}
+    .chat-header{display:flex;justify-content:space-between;align-items:center;padding:13px 18px;border-bottom:1px solid #e8e8e8}
+    .chat-header-title{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px}
+    .chat-close{background:none;border:none;cursor:pointer;font-size:18px;color:var(--g);font-family:inherit;line-height:1}
+    .chat-close:hover{color:var(--k)}
+    .chat-messages{padding:14px 18px;overflow-y:auto;max-height:280px;display:flex;flex-direction:column;gap:10px}
+    .chat-bubble{max-width:84%;padding:10px 14px;border-radius:3px;font-size:13px;line-height:1.55}
+    .chat-bubble.ai{background:#f5f5f5;color:var(--k);align-self:flex-start}
+    .chat-bubble.usr{background:var(--k);color:#fff;align-self:flex-end}
+    .chat-bubble.typing{background:#f5f5f5;color:#bbb;font-style:italic;align-self:flex-start}
+    .chat-input-row{display:flex;gap:8px;padding:10px 18px;border-top:1px solid #e8e8e8;align-items:flex-end}
+    .chat-textarea{flex:1;border:1.5px solid #ddd;border-radius:3px;padding:9px 12px;font-size:13px;font-family:inherit;resize:none;outline:none;min-height:38px;max-height:80px;line-height:1.45}
+    .chat-textarea:focus{border-color:var(--k)}
+    .chat-send{padding:9px 18px;background:var(--k);color:#fff;border:2px solid var(--k);border-radius:3px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+    .chat-send:hover{opacity:.85}.chat-send:disabled{opacity:.35;cursor:not-allowed}
+    .chat-submit-row{padding:0 18px 14px}
+    .btn-submit-idea{width:100%;padding:13px;background:var(--y);color:var(--k);border:2px solid var(--y);border-radius:3px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:.5px}
+    .btn-submit-idea:hover{opacity:.85}
+    .chat-submitted{padding:14px 18px;text-align:center;font-size:14px;color:#16a34a;font-weight:700}
+
+    /* CAPITAL STEP */
+    .cap-layout{display:grid;gap:clamp(20px,3vw,40px);grid-template-columns:1fr}
+    @media(min-width:820px){.cap-layout{grid-template-columns:1.1fr .9fr;align-items:start}}
+    .sbox{border:2px solid var(--hair);border-radius:3px;padding:clamp(28px,4vw,40px)}
+    .sbox h2{font-size:clamp(22px,2.6vw,30px);font-weight:800;letter-spacing:-.8px;margin-bottom:6px}
+    .sbox .sub{font-size:14px;color:var(--g);margin-bottom:24px;line-height:1.55}
+    .pill{display:inline-block;background:var(--y);color:var(--k);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;padding:5px 12px;border-radius:2px;margin-bottom:22px}
+    .ig{margin-bottom:18px}
+    .ig label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--g);margin-bottom:7px}
+    .ri{display:flex;align-items:center;border:2px solid var(--k);border-radius:3px;overflow:hidden}
+    .ri:focus-within{border-color:var(--y)}
+    .ri .pfx{padding:0 14px;font-size:20px;font-weight:700;border-right:2px solid var(--k);background:var(--cream);height:54px;display:flex;align-items:center}
+    .ri input{flex:1;background:transparent;border:none;outline:none;color:var(--k);font-size:20px;font-weight:700;padding:15px 14px;font-family:inherit;width:100%;min-width:0}
+    .hints{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+    .hb{padding:6px 14px;background:var(--w);border:1.5px solid #ddd;border-radius:2px;color:var(--k);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+    .hb:hover{border-color:var(--k)}
+    .est{background:#FFFBEB;border:1.5px solid var(--y);border-radius:3px;padding:12px 14px;margin-top:18px;font-size:13px;color:#92400e;display:none}
+    .est strong{font-size:15px;font-weight:800;color:#78350f}
+    .rec-note{font-size:12px;color:var(--g);margin-top:8px}.rec-note span{font-weight:700;color:var(--k)}
+    .cap-buttons{display:flex;flex-direction:column;gap:9px;margin-top:28px}
+    @media(min-width:540px){.cap-buttons{flex-direction:row-reverse}.cap-buttons .btn{flex:1}}
+    .cap-summary{border:2px solid var(--hair);border-radius:3px;padding:28px;background:var(--cream)}
+    .cap-summary h3{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:var(--g);margin-bottom:14px}
+    .cap-summary .srow{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #e8e0d8;font-size:13px}
+    .cap-summary .srow:last-child{border:none}
+    .cap-summary .srow span:first-child{color:var(--g)}
+    .cap-summary .srow span:last-child{font-weight:700;color:var(--k);font-variant-numeric:tabular-nums}
+
+    /* DONE */
+    .dbox{border:2px solid var(--hair);border-radius:3px;padding:clamp(32px,5vw,56px);text-align:center;max-width:620px;margin:0 auto}
+    .done-icon{width:72px;height:72px;background:var(--y);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 22px;font-weight:800}
+    .pend-icon{width:72px;height:72px;background:#FFFBEB;border:3px solid var(--y);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 22px}
+    .dbox h2{font-size:clamp(22px,3vw,32px);font-weight:800;letter-spacing:-.8px;margin-bottom:10px}
+    .dbox p{color:var(--g);font-size:15px;line-height:1.6;margin-bottom:10px}
+    .dd{border:1.5px solid var(--hair);border-radius:3px;overflow:hidden;margin:24px 0;text-align:left}
+    .dd .row{display:flex;justify-content:space-between;font-size:14px;padding:12px 16px;border-bottom:1px solid #f0f0f0}
+    .dd .row:last-child{border:none}
+    .dd .row span:first-child{color:var(--g)}
+    .dd .row span:last-child{font-weight:700;font-variant-numeric:tabular-nums}
+
+    /* LOADING + TOAST */
+    footer{text-align:center;padding:24px;font-size:10px;color:#bbb;text-transform:uppercase;letter-spacing:2.5px;border-top:1px solid var(--hair)}
+    #loading{display:none;position:fixed;inset:0;background:rgba(255,255,255,.92);align-items:center;justify-content:center;flex-direction:column;gap:14px;z-index:100}
+    #loading.show{display:flex}
+    .spin{width:38px;height:38px;border:3px solid #e8e8e8;border-top-color:var(--k);border-radius:50%;animation:spin .7s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .ltxt{font-size:11px;color:var(--g);font-weight:700;text-transform:uppercase;letter-spacing:1.5px}
+    #toast{display:none;position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--k);color:var(--w);padding:11px 22px;border-radius:3px;font-size:13px;z-index:200;font-weight:600}
+    #toast.show{display:block}
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="brand">
+    <img src="/static/assets/alaidin-logo-cropped.png" alt="alaidin">
+    <span class="surface">Buddies</span>
+  </div>
+  <div class="nav-tag">Friends &amp; Family</div>
+</nav>
+
+<div class="hero">
+  <div class="eyebrow">You're Invited</div>
+  <h1>Your money. <em>Friendsourced</em> signals.</h1>
+  <p class="hero-sub">A small circle of friends using AI to read where smart money flows — and quietly put it to work. No jargon. No subscriptions. Just a community edge, trading in your own account.</p>
+</div>
+
+<div class="art-wrap">
+  <object data="/static/assets/last-supper.svg" type="image/svg+xml" class="art-svg"></object>
+  <p class="art-cap">Alaidin &amp; the daily table — friends &amp; family edition</p>
+</div>
+
+<div class="steps-bar" id="steps-bar">
+  <div class="si active" id="ind-login"><div class="sn">1</div> <span class="label">Sign In</span></div>
+  <div class="ss"></div>
+  <div class="si" id="ind-strategy"><div class="sn">2</div> <span class="label">Strategy</span></div>
+  <div class="ss"></div>
+  <div class="si" id="ind-capital"><div class="sn">3</div> <span class="label">Capital</span></div>
+</div>
+
+<div class="content">
+
+  <!-- STEP 1: SIGN IN -->
+  <div id="step-login">
+    <div class="login-box">
+      <h2>Get a seat at the table.</h2>
+      <p class="sub">Sign in with your broker account to see the strategies running live. Your money never leaves your DMAT — Alaidin just places the orders.</p>
+      <div class="login-buttons">
+        <button class="btn btn-k" onclick="signIn()">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8.5" stroke="#111" stroke-width="1"/><path d="M9 4.5C7 4.5 5.5 6 5.5 8C5.5 10 7 11.5 9 11.5C11 11.5 12.5 10 12.5 8C12.5 6 11 4.5 9 4.5Z" fill="#111"/><path d="M3 15C3.5 12.5 6 11.5 9 11.5C12 11.5 14.5 12.5 15 15" stroke="#111" stroke-width="1" stroke-linecap="round"/></svg>
+          Sign in with Zerodha
+        </button>
+        <button class="btn btn-b" onclick="signInBreeze()">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8.5" stroke="#111" stroke-width="1"/><path d="M9 4.5C7 4.5 5.5 6 5.5 8C5.5 10 7 11.5 9 11.5C11 11.5 12.5 10 12.5 8C12.5 6 11 4.5 9 4.5Z" fill="#111"/><path d="M3 15C3.5 12.5 6 11.5 9 11.5C12 11.5 14.5 12.5 15 15" stroke="#111" stroke-width="1" stroke-linecap="round"/></svg>
+          Sign in with ICICI Breeze
+        </button>
+        <button class="btn btn-b" onclick="window.location.href='/observer'">Continue as Observer</button>
+      </div>
+      <p class="login-note">One-time sign-in. View strategies, choose one or more, set your capital.<br>No order is placed until you confirm.</p>
+    </div>
+  </div>
+
+  <!-- STEP 2: STRATEGY -->
+  <div id="step-strategy">
+    <p class="slabel">Live &amp; in-testing strategies <small id="strat-count"></small></p>
+    <div class="sgrid" id="strategy-grid"></div>
+
+    <div id="chat-panel">
+      <div class="chat-header">
+        <span class="chat-header-title">Strategy Builder</span>
+        <button class="chat-close" onclick="closeChat()" aria-label="Close">&#x2715;</button>
+      </div>
+      <div class="chat-messages" id="chat-messages"></div>
+      <div class="chat-submit-row" id="chat-submit-row" style="display:none">
+        <button class="btn-submit-idea" onclick="submitIdea()">Submit my idea →</button>
+      </div>
+      <div class="chat-submitted" id="chat-submitted" style="display:none">
+        ✓ Idea received! We'll review it and reach out soon.
+      </div>
+      <div class="chat-input-row" id="chat-input-row">
+        <textarea class="chat-textarea" id="chat-textarea" rows="1"
+          placeholder="Describe your strategy idea…"
+          onkeydown="chatKeydown(event)"></textarea>
+        <button class="chat-send" id="chat-send" onclick="sendChat()">Send</button>
+      </div>
+    </div>
+
+    <div class="sgrid-actions">
+      <button class="btn btn-p" id="btn-strategy-next" disabled onclick="goCapital()">Continue →</button>
+    </div>
+  </div>
+
+  <!-- STEP 3: CAPITAL -->
+  <div id="step-capital">
+    <div class="cap-layout">
+      <div class="sbox">
+        <h2>How much per trade?</h2>
+        <p class="sub">Set capital per signal for each strategy. Change anytime.</p>
+        <div id="capital-rows"></div>
+        <div class="cap-buttons">
+          <button class="btn btn-k" id="btn-capital-next" disabled onclick="doAuthorize()">Authorize →</button>
+          <button class="btn btn-g" onclick="goStrategy()">← Back</button>
+        </div>
+      </div>
+      <div class="cap-summary">
+        <h3>Your Setup</h3>
+        <div id="sum-rows"></div>
+        <div class="srow"><span>Broker</span><span id="sum-broker">Zerodha (Kite)</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 4: DONE / PENDING -->
+  <div id="step-done">
+    <div class="dbox" id="done-box-inner">
+      <div class="pend-icon">⏳</div>
+      <h2>Request received.</h2>
+    </div>
+  </div>
+
+</div>
+
+<footer>Alaidin Buddies &nbsp;·&nbsp; NSE Intraday &nbsp;·&nbsp; Friends &amp; Family Only</footer>
+
+<div id="loading"><div class="spin"></div><div class="ltxt">Connecting…</div></div>
+<div id="toast"></div>
+
+<script>
+// Marketing copy per strategy — descriptions, backtest reference stats, sparkline data.
+// Live status + live stats are fetched from the API and overlaid at runtime.
+const STRATEGY_COPY = {
+  BLOCK_DEAL_FADE: {
+    name: 'Block Deal Fade',
+    desc: 'AI spots a large institutional block deal the moment it hits the tape and quietly fades the move — in your account. Every trade has a built-in stop-loss.',
+    backtest_days: 105, avg_trade_num: 1295, avg_trade: '₹1,295', win_rate: '58%',
+    rec_capital: '₹2L', rec_capital_num: 200000,
+    days: [
+      {v:1,pnl:1800},{v:0,pnl:600},{v:1,pnl:1400},{v:1,pnl:2100},{v:0,pnl:400},
+      {v:1,pnl:900},{v:1,pnl:1700},{v:0,pnl:800},{v:1,pnl:1300},{v:1,pnl:2400},
+      {v:0,pnl:500},{v:1,pnl:1100},{v:1,pnl:1900},{v:0,pnl:300},{v:1,pnl:1500},
+      {v:1,pnl:2000},{v:1,pnl:800},{v:0,pnl:700},{v:1,pnl:1600},{v:0,pnl:450},
+      {v:1,pnl:1200},{v:1,pnl:2300},{v:0,pnl:550},{v:1,pnl:1000},{v:1,pnl:1750},
+    ],
+  },
+  PVI: {
+    name: 'Price Volume Imbalance',
+    desc: 'Detects institutional accumulation via HA candle climbs after heavy-volume block prints. Shorts the overextension with a VWAP exit and ML-tuned stop extension.',
+    backtest_days: 120, avg_trade_num: 1150, avg_trade: '₹1,150', win_rate: '82%',
+    rec_capital: '₹1L', rec_capital_num: 100000,
+    days: [
+      {v:1,pnl:1200},{v:1,pnl:900},{v:0,pnl:400},{v:1,pnl:1500},{v:1,pnl:1100},
+      {v:0,pnl:300},{v:1,pnl:1300},{v:1,pnl:1000},{v:1,pnl:1400},{v:0,pnl:500},
+      {v:1,pnl:1200},{v:1,pnl:800},{v:1,pnl:1600},{v:0,pnl:350},{v:1,pnl:1100},
+      {v:1,pnl:900},{v:1,pnl:1300},{v:0,pnl:450},{v:1,pnl:1400},{v:1,pnl:1000},
+      {v:1,pnl:1200},{v:0,pnl:400},{v:1,pnl:1500},{v:1,pnl:1100},{v:1,pnl:1300},
+    ],
+  },
+  BLOCK_DEAL_BOUNCE: {
+    name: 'Block Deal Bounce',
+    desc: 'When a large block prints below market, the AI anticipates the snap-back and rides the bounce long. Works best in high-liquidity large-caps.',
+    backtest_days: 91, avg_trade_num: 1140, avg_trade: '₹1,140', win_rate: '55%',
+    rec_capital: '₹2L', rec_capital_num: 200000,
+    days: [
+      {v:1,pnl:1500},{v:0,pnl:700},{v:1,pnl:1200},{v:0,pnl:400},{v:1,pnl:1800},
+      {v:1,pnl:900},{v:0,pnl:600},{v:1,pnl:1100},{v:1,pnl:1600},{v:0,pnl:500},
+      {v:1,pnl:1300},{v:0,pnl:350},{v:1,pnl:1700},{v:1,pnl:1000},{v:0,pnl:800},
+      {v:1,pnl:1400},{v:1,pnl:2000},{v:0,pnl:450},{v:1,pnl:1250},{v:1,pnl:900},
+      {v:0,pnl:600},{v:1,pnl:1550},{v:1,pnl:1100},{v:0,pnl:300},{v:1,pnl:1400},
+    ],
+  },
+  ORB_SHORT: {
+    name: 'Opening Range Break Short',
+    desc: 'Catches weak stocks breaking below their first 15-minute range at open. Tight stop above the range high, quick intraday exit.',
+    backtest_days: 85, avg_trade_num: 1413, avg_trade: '₹1,413', win_rate: '62%',
+    rec_capital: '₹2L', rec_capital_num: 200000,
+    days: [
+      {v:1,pnl:1100},{v:1,pnl:800},{v:0,pnl:550},{v:1,pnl:1300},{v:0,pnl:400},
+      {v:1,pnl:900},{v:0,pnl:700},{v:1,pnl:1000},{v:1,pnl:750},{v:0,pnl:600},
+      {v:1,pnl:1200},{v:1,pnl:850},{v:0,pnl:500},{v:1,pnl:950},{v:1,pnl:1100},
+      {v:0,pnl:350},{v:1,pnl:1050},{v:1,pnl:700},{v:0,pnl:450},{v:1,pnl:1300},
+      {v:0,pnl:600},{v:1,pnl:900},{v:1,pnl:1150},{v:0,pnl:500},{v:1,pnl:800},
+    ],
+  },
+  HA_REVERSAL: {
+    name: 'HA Reversal',
+    desc: '15-minute Heiken Ashi Supertrend flip at open. Enters on the first reversal candle with momentum confirmation. Trend-following with adaptive targets.',
+    backtest_days: 251, avg_trade_num: 1528, avg_trade: '₹1,528', win_rate: '51%',
+    rec_capital: '₹2L', rec_capital_num: 200000,
+    days: [
+      {v:1,pnl:1900},{v:1,pnl:1400},{v:0,pnl:600},{v:1,pnl:2100},{v:1,pnl:1700},
+      {v:0,pnl:500},{v:1,pnl:1600},{v:1,pnl:2200},{v:1,pnl:1300},{v:0,pnl:700},
+      {v:1,pnl:1800},{v:1,pnl:1500},{v:0,pnl:400},{v:1,pnl:2000},{v:0,pnl:550},
+      {v:1,pnl:1700},{v:1,pnl:1900},{v:1,pnl:1100},{v:0,pnl:650},{v:1,pnl:2300},
+      {v:1,pnl:1400},{v:0,pnl:450},{v:1,pnl:1600},{v:0,pnl:500},{v:1,pnl:2100},
+    ],
+  },
+  VWAP_MEAN_REVERSION_041: {
+    name: 'VWAP Mean Reversion',
+    desc: 'Long and short mean-reversion when price deviates more than 1.5% from VWAP with RSI at extremes. High-frequency intraday edge.',
+    backtest_days: 60, avg_trade_num: 800, avg_trade: '₹800', win_rate: '45%',
+    rec_capital: '₹20K', rec_capital_num: 20000,
+    days: [
+      {v:1,pnl:900},{v:0,pnl:400},{v:1,pnl:700},{v:1,pnl:1000},{v:0,pnl:300},
+      {v:1,pnl:800},{v:1,pnl:600},{v:0,pnl:500},{v:1,pnl:750},{v:1,pnl:900},
+      {v:0,pnl:350},{v:1,pnl:850},{v:1,pnl:700},{v:0,pnl:450},{v:1,pnl:950},
+      {v:1,pnl:800},{v:0,pnl:400},{v:1,pnl:700},{v:1,pnl:600},{v:0,pnl:500},
+      {v:1,pnl:900},{v:1,pnl:750},{v:0,pnl:350},{v:1,pnl:800},{v:1,pnl:650},
+    ],
+  },
+  BB_EXHAUSTION_042: {
+    name: 'Bollinger Exhaustion',
+    desc: 'Buys extreme oversold touches of the lower Bollinger Band with RSI(2) below 10. Mean-reversion long with tight trailing exit.',
+    backtest_days: 60, avg_trade_num: 700, avg_trade: '₹700', win_rate: '46%',
+    rec_capital: '₹20K', rec_capital_num: 20000,
+    days: [
+      {v:1,pnl:800},{v:0,pnl:350},{v:1,pnl:650},{v:1,pnl:900},{v:0,pnl:300},
+      {v:1,pnl:700},{v:1,pnl:550},{v:0,pnl:450},{v:1,pnl:800},{v:1,pnl:750},
+      {v:0,pnl:400},{v:1,pnl:900},{v:1,pnl:650},{v:0,pnl:300},{v:1,pnl:850},
+      {v:1,pnl:700},{v:0,pnl:400},{v:1,pnl:600},{v:1,pnl:750},{v:0,pnl:350},
+      {v:1,pnl:800},{v:1,pnl:700},{v:0,pnl:400},{v:1,pnl:750},{v:1,pnl:600},
+    ],
+  },
+};
+
+// STRATEGIES is built dynamically from API + STRATEGY_COPY. Seeded with fallback.
+let STRATEGIES = [
+  { id: 'BLOCK_DEAL_FADE', status: 'live',   ...STRATEGY_COPY.BLOCK_DEAL_FADE },
+  { id: 'PVI',             status: 'shadow',  ...STRATEGY_COPY.PVI },
+];
+
+// Fallback sparkline generator
+function _genDays(wr) {
+  const a = [];
+  for (let i = 0; i < 25; i++) {
+    const v = Math.random() < wr ? 1 : 0;
+    a.push({ v, pnl: 500 + Math.floor(Math.random() * 2000) });
+  }
+  return a;
+}
+
+async function loadStrategiesFromAPI() {
+  try {
+    const [liveResp, statsResp] = await Promise.all([
+      fetch('/api/strategies/live').then(r => r.json()).catch(() => ({})),
+      fetch('/api/observe/strategies').then(r => r.json()).catch(() => ({})),
+    ]);
+
+    const statsMap = {};
+    (statsResp.strategies || []).forEach(s => { statsMap[s.strategy_id] = s; });
+
+    // Build merged list: iterate live API to determine status, overlay copy + stats
+    const merged = [];
+    for (const [sid, info] of Object.entries(liveResp)) {
+      if (!info || info.enabled === false) continue;
+      const copy  = STRATEGY_COPY[sid];
+      if (!copy) continue; // no marketing copy = don't show on subscribe page
+
+      const lv = info.live_enabled;
+      const en = info.entry_enabled !== false; // default true if not present
+      let status;
+      if (lv && en)       status = 'live';
+      else if (lv && !en) status = 'paused';
+      else                status = 'shadow';
+
+      const stat = statsMap[sid] || {};
+      const liveAvgTrade = stat.avg_trade_rs != null ? Math.round(stat.avg_trade_rs) : null;
+      const liveWr       = stat.win_rate     != null ? (stat.win_rate * 100).toFixed(0) + '%' : null;
+
+      merged.push({
+        id: sid, status,
+        ...copy,
+        live_avg_trade: liveAvgTrade,
+        live_win_rate:  liveWr,
+        live_trades:    stat.n_trades || 0,
+        today_pnl:      stat.today_pnl_rs != null ? Math.round(stat.today_pnl_rs) : null,
+        open_positions: stat.open_positions || 0,
+        days:           copy.days || _genDays(0.55),
+      });
+    }
+
+    // Sort: live first, then paused, then shadow
+    const order = { live: 0, paused: 1, shadow: 2 };
+    merged.sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
+
+    STRATEGIES = merged.length ? merged : STRATEGIES;
+  } catch (_e) {
+    // Keep fallback STRATEGIES on any error
+  }
+  renderCards();
+  document.getElementById('strat-count').textContent =
+    STRATEGIES.filter(s => s.status === 'live').length + ' live · ' +
+    STRATEGIES.filter(s => s.status === 'shadow' || s.status === 'paused').length + ' in testing';
+}
+
+// ────────────────────────────────────────────────────────────────
+// Backward-compat shim: fetchLiveStats now delegates to loadStrategiesFromAPI
+function fetchLiveStats() { loadStrategiesFromAPI(); }
+// ────────────────────────────────────────────────────────────────
+
+
+// selStrats: Map of strategy_id → {strat, capital}
+let selStrats = new Map();
+let _sid = '', _kiteUser = '', _broker = 'kite';
+
+window.addEventListener('DOMContentLoaded', () => {
+  const p = new URLSearchParams(location.search);
+
+  if (p.get('browsing') === '1') {
+    _sid      = p.get('sid') || '';
+    _kiteUser = p.get('kite_user') || '';
+    _broker   = p.get('broker') || 'kite';
+    localStorage.setItem('sub_sid', _sid);
+    localStorage.setItem('sub_kite_user', _kiteUser);
+    localStorage.setItem('sub_broker', _broker);
+    history.replaceState({}, '', '/subscribe');
+    renderCards();
+    fetchLiveStats();
+    show('step-strategy'); ind('ind-strategy');
+    return;
+  }
+
+  if (p.get('pending') === '1') {
+    const sid = localStorage.getItem('sub_sid') || '';
+    const ku  = p.get('kite_user') || localStorage.getItem('sub_kite_user') || '—';
+    const kid = p.get('kite_id')   || localStorage.getItem('sub_kite_id')   || '';
+    const stid = p.get('strategy_id') || localStorage.getItem('sub_strategy_id') || '—';
+    const cap  = p.get('capital')     || localStorage.getItem('sub_capital')     || '—';
+    if (kid) localStorage.setItem('sub_kite_id', kid);
+    clearSub();
+    showPending(ku, stid, cap, kid);
+    return;
+  }
+  if (p.get('done') === '1') {
+    const ku   = p.get('kite_user') || '—';
+    const stid = p.get('strategy_id') || '—';
+    const cap  = parseInt(p.get('capital') || '0');
+    clearSub();
+    showDone([{strategy_id: stid, capital: cap}], ku, 'kite');
+    return;
+  }
+  if (p.get('error')) showToast('Error: ' + p.get('error'));
+
+  _sid      = localStorage.getItem('sub_sid') || '';
+  _kiteUser = localStorage.getItem('sub_kite_user') || '';
+  _broker   = localStorage.getItem('sub_broker') || 'kite';
+  if (_sid) {
+    renderCards();
+    fetchLiveStats();
+    show('step-strategy'); ind('ind-strategy');
+    return;
+  }
+
+  show('step-login'); ind('ind-login');
+});
+
+function clearSub() {
+  ['sub_sid','sub_kite_user','sub_kite_id','sub_strategy_id','sub_capital','sub_broker'].forEach(k => localStorage.removeItem(k));
+  // Clear per-strategy capital keys
+  Object.keys(localStorage).filter(k => k.startsWith('sub_capital_')).forEach(k => localStorage.removeItem(k));
+}
+
+function signIn()       { showLoad(true); window.location.href = '/api/subscribe/signin'; }
+function signInBreeze() { showLoad(true); window.location.href = '/api/subscribe/breeze-signin'; }
+
+function buildBars(days) {
+  const maxAbs = Math.max(...days.map(d => Math.abs(d.pnl)), 1);
+  return days.map(d => {
+    const h = Math.round(4 + (Math.abs(d.pnl) / maxAbs) * 16);
+    return `<div class="db ${d.v ? 'pos' : 'neg'}" style="height:${h}px"></div>`;
+  }).join('');
+}
+
+function renderCards() {
+  const live  = STRATEGIES.filter(s => s.status === 'live').length;
+  const shade = STRATEGIES.filter(s => s.status === 'shadow' || s.status === 'testing').length;
+  document.getElementById('strat-count').textContent = `${live} live · ${shade} in testing`;
+
+  const grid = document.getElementById('strategy-grid');
+  grid.innerHTML = STRATEGIES.map(s => {
+    const per1L    = Math.round((100000 / s.rec_capital_num) * s.avg_trade_num);
+    const per1LFmt = '₹' + per1L.toLocaleString('en-IN');
+    const badgeHtml = s.status === 'live'
+      ? '<div class="live-dot"></div>Live'
+      : (s.status === 'shadow' || s.status === 'testing')
+      ? '<div class="shadow-dot"></div>In testing'
+      : 'Paused';
+    let liveHtml = '<div class="sv" style="color:#ccc">—</div><div class="sl">Live avg / trade</div>';
+    if (s.live_stats && s.live_stats.trades >= 5) {
+      const cls = s.live_stats.avg_pnl >= 0 ? 'g' : 'r';
+      liveHtml = `<div class="sv ${cls}">₹${Math.abs(s.live_stats.avg_pnl).toLocaleString('en-IN')}${s.live_stats.avg_pnl < 0 ? ' loss' : ''}</div><div class="sl">Live avg / trade</div>`;
+    }
+    const clickAttr = s.status !== 'disabled' ? `onclick="pickStrat('${s.id}')"` : '';
+    return `
+    <div class="sc status-${s.status}" id="card-${s.id}" ${clickAttr}>
+      <div class="sc-head"><div class="cbadge">${badgeHtml}</div></div>
+      <div class="cname">${s.name}</div>
+      <div class="rec-cap-inline">${s.rec_capital} recommended</div>
+      <div class="cdesc">${s.desc}</div>
+      <div class="day-bars-label">Last ${s.days.length} trading days</div>
+      <div class="day-bars">${buildBars(s.days)}</div>
+      <div class="cstats">
+        <div><div class="sv g b">${per1LFmt}</div><div class="sl">/ trade on ₹1L</div></div>
+        <div><div class="sv g">${s.avg_trade}</div><div class="sl">Backtest avg / trade</div></div>
+        <div>${liveHtml}</div>
+        <div><div class="sv">${s.win_rate}</div><div class="sl">Win rate</div></div>
+        <div><div class="sv">${s.backtest_days}d</div><div class="sl">Backtest days</div></div>
+      </div>
+    </div>`;
+  }).join('') + proposeCardHTML();
+}
+
+function proposeCardHTML() {
+  return `
+  <div class="sc-propose" onclick="openChat()">
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#d4a800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
+    </svg>
+    <h3>Got a strategy idea?</h3>
+    <p>Tell us how you trade — in plain English.<br>We'll structure it for you.</p>
+    <span class="btn-propose">Start chatting →</span>
+  </div>`;
+}
+
+function pickStrat(id) {
+  const s = STRATEGIES.find(x => x.id === id);
+  if (!s || s.status === 'disabled') return;
+  const card = document.getElementById('card-' + id);
+  if (selStrats.has(id)) {
+    selStrats.delete(id);
+    card.classList.remove('selected');
+  } else {
+    selStrats.set(id, { strat: s, capital: 0 });
+    card.classList.add('selected');
+  }
+  document.getElementById('btn-strategy-next').disabled = selStrats.size === 0;
+}
+
+function goCapital() {
+  if (selStrats.size === 0) return;
+  show('step-capital'); ind('ind-capital');
+  document.getElementById('sum-broker').textContent =
+    _broker === 'breeze' ? 'ICICI (Breeze)' : 'Zerodha (Kite)';
+
+  // Build one capital row per selected strategy
+  const rowsEl = document.getElementById('capital-rows');
+  const sumEl  = document.getElementById('sum-rows');
+  rowsEl.innerHTML = '';
+  sumEl.innerHTML  = '';
+
+  for (const [id, entry] of selStrats) {
+    const s = entry.strat;
+    const savedKey = 'sub_capital_' + id;
+    const saved = localStorage.getItem(savedKey) || '';
+    rowsEl.innerHTML += `
+      <div class="ig" style="margin-bottom:18px">
+        <label style="font-weight:700">${s.name}</label>
+        <small style="color:#888;display:block;margin-bottom:6px">Recommended: ${s.rec_capital} / trade</small>
+        <div class="ri">
+          <div class="pfx">₹</div>
+          <input type="number" id="cap-${id}" placeholder="${s.rec_capital_num}" min="5000" step="5000"
+            value="${saved}" oninput="onCapitalChange()">
+        </div>
+        <div class="hints">
+          <button class="hb" onclick="setCapital('${id}',10000)">₹10K</button>
+          <button class="hb" onclick="setCapital('${id}',25000)">₹25K</button>
+          <button class="hb" onclick="setCapital('${id}',50000)">₹50K</button>
+          <button class="hb" onclick="setCapital('${id}',100000)">₹1L</button>
+          <button class="hb" onclick="setCapital('${id}',200000)">₹2L</button>
+        </div>
+      </div>`;
+    sumEl.innerHTML += `
+      <div class="srow"><span>${s.name}</span><span id="sum-cap-${id}">—</span></div>
+      <div class="srow" style="color:#999;font-size:12px"><span>Win rate</span><span>${s.win_rate}</span></div>`;
+  }
+  onCapitalChange();
+}
+
+function goStrategy() { show('step-strategy'); ind('ind-strategy'); }
+
+function setCapital(id, v) {
+  document.getElementById('cap-' + id).value = v;
+  onCapitalChange();
+}
+
+function onCapitalChange() {
+  let allValid = selStrats.size > 0;
+  for (const [id, entry] of selStrats) {
+    const v = parseInt(document.getElementById('cap-' + id)?.value) || 0;
+    entry.capital = v;
+    localStorage.setItem('sub_capital_' + id, v);
+    const sumEl = document.getElementById('sum-cap-' + id);
+    if (sumEl) sumEl.textContent = v >= 5000 ? '₹' + v.toLocaleString('en-IN') : '—';
+    if (v < 5000) allValid = false;
+  }
+  document.getElementById('btn-capital-next').disabled = !allValid;
+}
+
+function doAuthorize() {
+  if (selStrats.size === 0) { showToast('No strategy selected.'); return; }
+  if (!_sid) { showToast('Session expired — please sign in again.'); show('step-login'); ind('ind-login'); return; }
+  // Re-read capitals from inputs in case onCapitalChange was not triggered
+  for (const [id, entry] of selStrats) {
+    const inp = document.getElementById('cap-' + id);
+    if (inp) entry.capital = parseInt(inp.value) || 0;
+  }
+  const strategies = [];
+  for (const [id, entry] of selStrats) {
+    if (entry.capital < 5000) { showToast('Enter at least ₹5,000 for ' + (entry.strat?.name || id)); return; }
+    strategies.push({ strategy_id: id, capital: entry.capital });
+  }
+  if (!strategies.length) { showToast('No valid strategy entries — please re-select.'); return; }
+  showLoad(true);
+  fetch('/api/subscribe/confirm', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ sid: _sid, strategies }),
+  })
+    .then(r => r.json())
+    .then(d => {
+      showLoad(false);
+      if (d.error) { showToast(d.error); return; }
+      if (d.status === 'done') {
+        clearSub();
+        showDone(d.strategies || strategies, d.kite_user || _kiteUser, d.broker || _broker);
+      } else {
+        showPending(d.kite_user || _kiteUser, d.strategies || strategies);
+      }
+    })
+    .catch(() => { showLoad(false); showToast('Network error — try again.'); });
+}
+
+function show(id) {
+  ['step-login','step-strategy','step-capital','step-done'].forEach(s => {
+    document.getElementById(s).classList.toggle('on', s === id);
+  });
+  document.getElementById('steps-bar').style.display = id === 'step-done' ? 'none' : 'flex';
+}
+
+function ind(active) {
+  const ord = {'ind-login':1,'ind-strategy':2,'ind-capital':3};
+  ['ind-login','ind-strategy','ind-capital'].forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.remove('active','done');
+    if (ord[id] < ord[active]) el.classList.add('done');
+    if (ord[id] === ord[active]) el.classList.add('active');
+  });
+}
+
+function showDone(strategies, user, broker) {
+  show('step-done');
+  // Accept both array (new) and legacy sid/cap scalar
+  if (!Array.isArray(strategies)) strategies = [{ strategy_id: strategies, capital: user, name: user }];
+  const rows = strategies.map(s => {
+    const info = STRATEGIES.find(x => x.id === s.strategy_id) || { name: s.strategy_id };
+    return `<div class="row"><span>${info.name}</span><span>₹${(s.capital||0).toLocaleString('en-IN')} / trade</span></div>`;
+  }).join('');
+  document.getElementById('done-box-inner').innerHTML = `
+    <div class="done-icon">✓</div>
+    <h2>You're at the table.</h2>
+    <p>Account connected. Alaidin will execute signals in your broker account during market hours.</p>
+    <div class="dd">
+      ${rows}
+      <div class="row"><span>Broker</span><span>${broker === 'kite' ? 'Zerodha (Kite)' : 'ICICI (Breeze)'}</span></div>
+      ${user ? `<div class="row"><span>Account</span><span>${user}</span></div>` : ''}
+      <div class="row"><span>Status</span><span style="color:#16a34a;font-weight:800;">● Active</span></div>
+    </div>
+    <p style="font-size:13px;color:#bbb;margin-top:8px;">Questions? Ping Rajiv. To leave, revoke app access from your broker settings.</p>
+    <button onclick="window.location.href='/dashboard'" style="margin-top:18px;width:100%;padding:14px;background:#16a34a;color:#fff;border:none;border-radius:3px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">Go to Dashboard →</button>`;
+}
+
+let _approvalPollTimer = null;
+
+function showPending(name, strategies, cap, kiteId) {
+  show('step-done');
+  // Accept both array (new) and legacy sid/cap scalars
+  if (!Array.isArray(strategies)) strategies = [{ strategy_id: strategies, capital: cap }];
+  const rows = strategies.map(s => {
+    const info = STRATEGIES.find(x => x.id === s.strategy_id) || { name: s.strategy_id };
+    return `<div class="row"><span>${info.name}</span><span>${s.capital ? '₹' + s.capital.toLocaleString('en-IN') + ' / trade' : '—'}</span></div>`;
+  }).join('');
+  document.getElementById('done-box-inner').innerHTML = `
+    <div class="pend-icon">⏳</div>
+    <h2>Request received.</h2>
+    <p>Your Zerodha account is verified. Rajiv will review and give you a seat at the table — usually within a few hours.</p>
+    <div class="dd">
+      <div class="row"><span>Account</span><span>${name || '—'}</span></div>
+      ${rows}
+      <div class="row"><span>Status</span><span style="color:#d97706;font-weight:800;">⏳ Pending approval</span></div>
+    </div>
+    <p style="font-size:13px;color:#bbb;margin-top:8px;">Questions? Ping Rajiv on Telegram.</p>`;
+
+  if (_approvalPollTimer) clearInterval(_approvalPollTimer);
+  const kid = kiteId || localStorage.getItem('sub_kite_id') || '';
+  if (!kid) return;
+  _approvalPollTimer = setInterval(() => {
+    fetch('/api/subscribe/status?kite_id=' + encodeURIComponent(kid))
+      .then(r => r.json())
+      .then(d => {
+        if (d.status === 'approved') {
+          clearInterval(_approvalPollTimer);
+          _approvalPollTimer = null;
+          localStorage.removeItem('sub_kite_id');
+          showToast('You\'re approved! Loading your dashboard…');
+          setTimeout(() => { window.location.href = '/dashboard'; }, 1500);
+        }
+      })
+      .catch(() => {});
+  }, 5000);
+}
+
+function showLoad(v) { document.getElementById('loading').classList.toggle('show', v); }
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 4000);
+}
+
+// ── CHAT
+let _chatMsgs = [], _chatUserCount = 0, _chatBusy = false;
+
+const _CHAT_INTRO = "Hi! I'm here to help turn your trading idea into a structured strategy. "
+  + "Let's start simple — what kind of market event or signal triggers your trade? "
+  + "(For example: a gap up at open, a volume spike, a chart pattern, or breaking news?)";
+
+function openChat() {
+  const panel = document.getElementById('chat-panel');
+  panel.classList.add('open');
+  if (_chatMsgs.length === 0) {
+    _appendBubble('ai', _CHAT_INTRO);
+    _chatMsgs.push({ role: 'assistant', content: _CHAT_INTRO });
+  }
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  document.getElementById('chat-textarea').focus();
+}
+
+function closeChat() { document.getElementById('chat-panel').classList.remove('open'); }
+
+function chatKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+}
+
+function sendChat() {
+  if (_chatBusy) return;
+  const ta   = document.getElementById('chat-textarea');
+  const text = ta.value.trim();
+  if (!text) return;
+  ta.value = '';
+  _chatBusy = true;
+  document.getElementById('chat-send').disabled = true;
+  _appendBubble('usr', text);
+  _chatMsgs.push({ role: 'user', content: text });
+  _chatUserCount++;
+  const typingId = 'typing-' + Date.now();
+  _appendBubble('typing', 'Thinking…', typingId);
+  fetch('/api/subscribe/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages: _chatMsgs }),
+  })
+  .then(r => r.json())
+  .then(d => {
+    _removeBubble(typingId);
+    if (d.reply) {
+      _appendBubble('ai', d.reply);
+      _chatMsgs.push({ role: 'assistant', content: d.reply });
+    }
+    if (d.done && d.strategy_json) window._strategyJson = d.strategy_json;
+    if (_chatUserCount >= 3) document.getElementById('chat-submit-row').style.display = 'block';
+  })
+  .catch(() => {
+    _removeBubble(typingId);
+    _appendBubble('ai', 'Sorry, something went wrong. Please try again.');
+  })
+  .finally(() => {
+    _chatBusy = false;
+    document.getElementById('chat-send').disabled = false;
+    document.getElementById('chat-textarea').focus();
+  });
+}
+
+function submitIdea() {
+  document.getElementById('chat-submit-row').style.display = 'none';
+  document.getElementById('chat-input-row').style.display  = 'none';
+  fetch('/api/subscribe/chat/submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sid: _sid || null, messages: _chatMsgs,
+      strategy_json: window._strategyJson || null, user_name: _kiteUser || 'Anonymous' }),
+  })
+  .then(r => r.json())
+  .then(() => { document.getElementById('chat-submitted').style.display = 'block'; })
+  .catch(() => {
+    showToast('Submit failed — try again.');
+    document.getElementById('chat-submit-row').style.display = 'block';
+    document.getElementById('chat-input-row').style.display  = 'flex';
+  });
+}
+
+function _appendBubble(type, text, id) {
+  const wrap = document.getElementById('chat-messages');
+  const div  = document.createElement('div');
+  div.className = 'chat-bubble ' + type;
+  div.textContent = text;
+  if (id) div.id = id;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+function _removeBubble(id) { const el = document.getElementById(id); if (el) el.remove(); }
+</script>
+</body>
+</html>

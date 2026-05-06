@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Alaidin Chat</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--y:#F5C518;--k:#111;--g:#666;--mut:#999;--w:#fff;--cream:#FAFAF8;--hair:#e8e8e8}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--cream);color:var(--k);min-height:100vh;display:flex;flex-direction:column;font-size:15px}
+.container{flex:1;display:flex;flex-direction:column;max-width:920px;width:100%;margin:0 auto;padding:clamp(16px,3vw,28px);gap:14px}
+
+.chat-header{background:var(--y);border:2px solid var(--k);border-radius:3px;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px}
+.brand{display:flex;align-items:center;gap:14px}
+.brand img{height:52px;width:auto;display:block}
+.brand .surface{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:3px;color:var(--k);padding-left:14px;border-left:1px solid rgba(17,17,17,.2)}
+.tagline{font-size:11px;color:rgba(17,17,17,.6);font-weight:500;letter-spacing:.3px}
+.agent-status{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.agent{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px}
+.agent-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.agent-name{color:var(--k)}
+.ready{background:var(--k)}
+.processing{background:var(--k);animation:blink 1.2s ease-in-out infinite}
+.complete{background:var(--k)}
+.idle{background:rgba(17,17,17,.2)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+
+.messages{flex:1;overflow-y:auto;padding:8px 0;scroll-behavior:smooth;min-height:380px;display:flex;flex-direction:column;gap:10px}
+.message{display:flex;flex-direction:column;animation:slideIn .3s ease-out}
+@keyframes slideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.user-message{align-items:flex-end}
+.assistant-message{align-items:flex-start}
+.status-message{align-items:flex-start;margin-left:1.5rem}
+.msg-bubble{padding:14px 18px;border-radius:3px;max-width:78%;word-wrap:break-word;line-height:1.55}
+.user-message .msg-bubble{background:var(--y);color:var(--k);border:2px solid var(--y);font-weight:600;box-shadow:0 2px 8px rgba(245,197,24,.3)}
+.assistant-message .msg-bubble{background:var(--w);border:2px solid var(--hair);color:var(--k)}
+.status-message .msg-bubble{background:#fffde7;border-left:3px solid var(--k);font-size:12px;color:var(--g);padding:8px 12px 8px 20px;max-width:88%;position:relative;border-radius:2px;border-top:1px solid var(--hair);border-right:1px solid var(--hair);border-bottom:1px solid var(--hair)}
+.status-message .msg-bubble::before{content:'▶';position:absolute;left:7px;top:50%;transform:translateY(-50%);color:var(--k);font-size:8px;opacity:.6}
+
+.composer{background:var(--w);border:2px solid var(--hair);border-radius:3px;padding:14px;display:flex;gap:10px;align-items:flex-end}
+.composer:focus-within{border-color:var(--k)}
+.composer textarea{flex:1;padding:10px 14px;border:1.5px solid var(--hair);border-radius:2px;font-size:14px;resize:none;font-family:inherit;min-height:44px;max-height:120px;outline:none;transition:border-color .15s;background:var(--cream);color:var(--k)}
+.composer textarea:focus{border-color:var(--k);background:var(--w)}
+.send-btn{background:var(--k);color:var(--w);border:2px solid var(--k);padding:10px 20px;border-radius:2px;font-weight:700;cursor:pointer;font-size:13px;height:44px;display:flex;align-items:center;gap:6px;font-family:inherit;text-transform:uppercase;letter-spacing:.5px;transition:opacity .15s;white-space:nowrap}
+.send-btn:hover{opacity:.85}
+.send-btn:disabled{opacity:.3;cursor:not-allowed}
+
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{background:var(--w);border:1.5px solid var(--hair);border-radius:2px;padding:6px 12px;font-size:11px;font-weight:700;color:var(--g);cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:.5px;transition:all .15s}
+.chip:hover{border-color:var(--k);color:var(--k);background:var(--y)}
+
+.typing{display:inline-flex;gap:4px;padding:4px 0}
+.typing span{width:6px;height:6px;background:var(--k);border-radius:50%;animation:typing 1.2s infinite}
+.typing span:nth-child(2){animation-delay:.2s}
+.typing span:nth-child(3){animation-delay:.4s}
+@keyframes typing{0%,60%,100%{opacity:.25;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
+
+.msg-bubble strong{font-weight:800;letter-spacing:-.2px}
+.msg-bubble pre{background:#f5f5f5;padding:10px;border-radius:2px;font-size:12px;overflow-x:auto;margin-top:8px;white-space:pre-wrap}
+.back-link{font-size:12px;color:var(--g);text-decoration:none;font-weight:600}
+.back-link:hover{color:var(--k)}
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="chat-header">
+  <div class="brand">
+    <img src="/static/assets/alaidin-logo-cropped.png" alt="alaidin">
+    <span class="surface">Chat</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:20px">
+    <div class="agent-status">
+      <div class="agent"><span class="agent-dot idle" id="dot-0"></span><span class="agent-name">Price</span></div>
+      <div class="agent"><span class="agent-dot idle" id="dot-1"></span><span class="agent-name">Indicator</span></div>
+      <div class="agent"><span class="agent-dot idle" id="dot-2"></span><span class="agent-name">Analyzer</span></div>
+      <div class="agent"><span class="agent-dot idle" id="dot-3"></span><span class="agent-name">Reporter</span></div>
+    </div>
+    <a href="/dashboard" class="back-link">← Dashboard</a>
+  </div>
+</div>
+
+<div class="messages" id="msgs">
+  <div class="message assistant-message">
+    <div class="msg-bubble"><strong>Alaidin:</strong> I can analyze any NSE ticker — price action, indicators, intraday patterns. What would you like to look at?</div>
+  </div>
+</div>
+
+<div class="chips" id="chips">
+  <span class="chip" data-q="RELIANCE intraday setup">RELIANCE intraday</span>
+  <span class="chip" data-q="Analyze HDFCBANK with RSI and MACD">HDFCBANK · RSI</span>
+  <span class="chip" data-q="Bollinger bands on INFY 5 min">INFY Bollinger</span>
+  <span class="chip" data-q="Is TATAMOTORS overbought right now?">TATAMOTORS overbought?</span>
+</div>
+
+<form class="composer" id="form">
+  <textarea id="input" placeholder="Ask about any NSE ticker — e.g. RELIANCE intraday with RSI" rows="1"></textarea>
+  <button type="submit" class="send-btn" id="send">Send →</button>
+</form>
+
+</div>
+
+<script>
+const msgs  = document.getElementById('msgs');
+const input = document.getElementById('input');
+const send  = document.getElementById('send');
+const chips = document.getElementById('chips');
+
+let sessionId = 'aladin_' + Date.now();
+
+function dot(i) { return document.getElementById('dot-' + i); }
+function setDot(i, state) { dot(i).className = 'agent-dot ' + state; }
+function setAllDots(state) { [0,1,2,3].forEach(i => setDot(i, state)); }
+
+function bubble(cls, html) {
+  const d = document.createElement('div');
+  d.className = 'message ' + cls;
+  const b = document.createElement('div');
+  b.className = 'msg-bubble';
+  b.innerHTML = html;
+  d.appendChild(b);
+  msgs.appendChild(d);
+  msgs.scrollTop = msgs.scrollHeight;
+  return d;
+}
+
+input.addEventListener('input', () => {
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+});
+
+chips.addEventListener('click', e => {
+  const c = e.target.closest('.chip');
+  if (!c) return;
+  input.value = c.dataset.q;
+  input.dispatchEvent(new Event('input'));
+  submit();
+});
+
+document.getElementById('form').addEventListener('submit', e => { e.preventDefault(); submit(); });
+
+async function submit() {
+  const text = input.value.trim();
+  if (!text) return;
+
+  bubble('user-message', '<strong>You:</strong> ' + text.replace(/</g, '&lt;'));
+  input.value = '';
+  input.style.height = 'auto';
+  send.disabled = true;
+  chips.style.display = 'none';
+
+  const typingBubble = bubble('assistant-message',
+    '<strong>Alaidin:</strong> <span class="typing"><span></span><span></span><span></span></span>');
+  setAllDots('processing');
+
+  try {
+    const res = await fetch('/api/aladin/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text, session_id: sessionId }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Request failed' }));
+      typingBubble.querySelector('.msg-bubble').innerHTML =
+        '<strong>Alaidin:</strong> ' + (err.error || 'Something went wrong.');
+      setAllDots('idle');
+      send.disabled = false;
+      return;
+    }
+
+    const contentType = res.headers.get('content-type') || '';
+
+    if (contentType.includes('text/event-stream')) {
+      // SSE streaming response
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let finalText = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const evt = JSON.parse(line.slice(6));
+            if (evt.type === 'stream_end') break;
+            if (evt.type === 'error') {
+              finalText = evt.message || 'An error occurred.';
+              break;
+            }
+            // Show agent status updates
+            if (evt.type === 'agent_update' && evt.agent) {
+              const idx = ['price','indicator','analyzer','reporter'].indexOf(evt.agent.toLowerCase());
+              if (idx >= 0) setDot(idx, evt.status === 'complete' ? 'complete' : 'processing');
+              if (evt.message) bubble('status-message', evt.message);
+            }
+            if (evt.type === 'content' && evt.text) {
+              finalText += evt.text;
+            }
+            if (evt.response) finalText = evt.response;
+          } catch {}
+        }
+      }
+
+      typingBubble.querySelector('.msg-bubble').innerHTML =
+        '<strong>Alaidin:</strong> ' + (finalText || 'Done.');
+
+    } else {
+      // JSON response
+      const data = await res.json();
+      if (data.session_id) sessionId = data.session_id;
+      const reply = data.response || data.message || data.error || 'No response.';
+      typingBubble.querySelector('.msg-bubble').innerHTML =
+        '<strong>Alaidin:</strong> ' + reply.replace(/\n/g, '<br>');
+    }
+
+  } catch (e) {
+    typingBubble.querySelector('.msg-bubble').innerHTML =
+      '<strong>Alaidin:</strong> Connection error — please try again.';
+  }
+
+  setAllDots('idle');
+  send.disabled = false;
+}
+</script>
+</body>
+</html>

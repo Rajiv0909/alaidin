@@ -1,0 +1,204 @@
+/* ============================================================
+   Alaidin Design System — Colors & Type
+   ------------------------------------------------------------
+   One company, three surfaces. Tokens are name-spaced per surface
+   so they can co-exist in a single page.
+
+     --buddies-* → Alaidin Buddies (marketing/invite, light editorial)
+     --console-* → Alaidin Console (dark trader dashboard)
+     --chat-*    → ALADIN Chat (red agent UI)
+
+   Plus shared semantics (--success, --danger, --warn, --info).
+   ============================================================ */
+
+:root {
+    /* ---------------- SHARED SEMANTIC ---------------- */
+    --success:       #16a34a;   /* green: live, positive P&L */
+    --success-soft:  #d4edda;
+    --success-ink:   #155724;
+    --danger:        #dc2626;   /* red: short, negative P&L */
+    --danger-soft:   #f8d7da;
+    --danger-ink:    #721c24;
+    --warn:          #d97706;   /* amber: shadow/testing, pending */
+    --warn-soft:     #fffbeb;
+    --warn-ink:      #92400e;
+    --info:          #3b82f6;   /* blue: neutral figure highlight */
+    --idle:          #6c757d;
+
+    /* ---------------- BUDDIES (editorial light) ---------------- */
+    --buddies-yellow:    #F5C518;   /* signature highlight, IMDB-like */
+    --buddies-yellow-ink:#78350f;
+    --buddies-ink:       #111111;   /* primary text + borders */
+    --buddies-muted:     #666666;
+    --buddies-hairline:  #e8e8e8;   /* subtle rule */
+    --buddies-cream:     #FAFAF8;   /* backdrop for art/capital box */
+    --buddies-paper:     #ffffff;
+    --buddies-disabled:  #d1d5db;
+
+    /* Buddies radii (intentionally small/square) */
+    --buddies-radius-sm: 2px;
+    --buddies-radius:    3px;
+
+    /* Buddies borders (intentionally heavy/editorial) */
+    --buddies-border:    2px solid var(--buddies-ink);
+    --buddies-hairline-border: 1px solid var(--buddies-hairline);
+
+    /* ---------------- CONSOLE (dark trader) ---------------- */
+    --console-bg:        #0a0a0f;
+    --console-card:      #13131a;
+    --console-border:    #23232f;
+    --console-text:      #e8e8f0;
+    --console-muted:     #8888aa;
+    --console-accent:    #7c3aed;   /* violet — brand accent */
+    --console-green:     #16a34a;
+    --console-red:       #dc2626;
+    --console-yellow:    #d97706;
+    --console-blue:      #3b82f6;
+
+    --console-radius:    12px;
+    --console-pad:       20px;
+
+    /* ---------------- CHAT (red agent) ---------------- */
+    --chat-primary:      #dc3545;   /* ALADIN red */
+    --chat-primary-dark: #c82333;
+    --chat-bg:           #ffffff;
+    --chat-surface:      #f8f9fa;   /* gradient base */
+    --chat-surface-2:    #f1f5f9;   /* gradient stop */
+    --chat-border:       #e9ecef;
+    --chat-text:         #333333;
+    --chat-muted:        #6c757d;
+    --chat-shadow:       0 2px 8px rgba(0, 0, 0, 0.1);
+    --chat-shadow-red:   0 2px 8px rgba(220, 53, 69, 0.3);
+    --chat-radius:       8px;
+
+    /* ================== TYPE ================== */
+
+    /* Display / logo wordmark — Alaidin Buddies */
+    --font-display: 'Nunito', system-ui, -apple-system, sans-serif;
+
+    /* UI / body — the whole suite */
+    --font-ui:     -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+
+    /* Monospace — used sparingly for tickers/prices if needed */
+    --font-mono:   ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+    /* Scale — tight, no-nonsense */
+    --fs-xxs:   10px;
+    --fs-xs:    11px;
+    --fs-sm:    12px;
+    --fs-base:  13px;   /* dashboard tables */
+    --fs-body:  15px;   /* chat + marketing body */
+    --fs-md:    18px;
+    --fs-lg:    22px;
+    --fs-xl:    26px;
+    --fs-2xl:   32px;
+    --fs-hero:  52px;
+    --fs-logo:  3.5rem;  /* chat wordmark */
+
+    /* Weight — editorial uses extreme weights */
+    --fw-thin:   100;
+    --fw-reg:    400;
+    --fw-med:    500;
+    --fw-semi:   600;
+    --fw-bold:   700;
+    --fw-xbold:  800;
+    --fw-black:  900;
+    --fw-heavy:  1000;
+
+    /* Tracking */
+    --ls-tight:  -1.5px;
+    --ls-label:  2.5px;   /* uppercase eyebrows */
+    --ls-label-sm: 0.5px;
+
+    /* Line heights */
+    --lh-tight:  1.05;
+    --lh-body:   1.55;
+    --lh-loose:  1.65;
+}
+
+/* ================== SEMANTIC TYPE CLASSES ================== */
+
+.type-logo-buddies {
+    font-family: var(--font-display);
+    font-weight: var(--fw-black);
+    font-size: var(--fs-lg);
+    letter-spacing: 0;
+    color: var(--buddies-ink);
+}
+
+/* The hero wordmark on the chat UI — thin "ala" + black "idin" */
+.type-logo-chat {
+    font-family: var(--font-ui);
+    font-size: var(--fs-logo);
+    letter-spacing: -0.02em;
+    line-height: 1;
+    color: #000;
+}
+.type-logo-chat .thin { font-weight: var(--fw-thin); }
+.type-logo-chat .bold { font-weight: var(--fw-heavy); }
+
+.type-hero-buddies {
+    font-family: var(--font-ui);
+    font-size: clamp(22px, 4.5vw, 52px);
+    font-weight: var(--fw-xbold);
+    line-height: var(--lh-tight);
+    letter-spacing: var(--ls-tight);
+    color: var(--buddies-ink);
+}
+.type-hero-buddies em {
+    font-style: normal;
+    border-bottom: 4px solid var(--buddies-yellow);
+}
+
+.type-h2 {
+    font-family: var(--font-ui);
+    font-size: var(--fs-xl);
+    font-weight: var(--fw-xbold);
+    letter-spacing: -0.5px;
+    line-height: 1.15;
+}
+
+.type-h3 {
+    font-family: var(--font-ui);
+    font-size: var(--fs-md);
+    font-weight: var(--fw-xbold);
+    letter-spacing: -0.3px;
+}
+
+.type-body {
+    font-family: var(--font-ui);
+    font-size: var(--fs-body);
+    line-height: var(--lh-loose);
+    color: var(--buddies-muted);
+}
+
+.type-eyebrow {
+    font-family: var(--font-ui);
+    font-size: var(--fs-xxs);
+    font-weight: var(--fw-xbold);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-label);
+    color: var(--buddies-muted);
+}
+
+.type-label {
+    font-family: var(--font-ui);
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-bold);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--console-muted);
+}
+
+.type-stat {
+    font-family: var(--font-ui);
+    font-size: var(--fs-xl);
+    font-weight: var(--fw-xbold);
+    letter-spacing: -0.5px;
+}
+
+.type-mono-ticker {
+    font-family: var(--font-ui);
+    font-weight: var(--fw-bold);
+    letter-spacing: 0.3px;
+}

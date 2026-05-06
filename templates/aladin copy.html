@@ -1,0 +1,2417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ALADIN - Enhanced Chart Visualization</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+   <style>
+        :root {
+            --color-bg: #ffffff;
+            --color-text: #333333;
+            --color-border: #e9ecef;
+            --color-primary: #dc3545;
+            --color-success: #28a745;
+            --color-warning: #ffc107;
+            --color-info: #17a2b8;
+            --color-light: #f8f9fa;
+            --color-secondary: #6c757d;
+            --color-accent: #dc3545;
+            --color-ready: #28a745;
+            --color-processing: #ffc107;
+            --color-error: #dc3545;
+            --color-idle: #6c757d;
+            --font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+            --border-radius: 8px;
+            --box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            --transition: all 0.2s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-family);
+            color: var(--color-text);
+            background-color: var(--color-bg);
+            line-height: 1.5;
+            overflow: hidden;
+            font-size: 15px;
+        }
+
+        #aladin-container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header Styles */
+        #aladin-header {
+            background: linear-gradient(135deg, var(--color-light) 0%, #f1f5f9 100%);
+            border-bottom: 1.5px solid var(--color-border);
+            padding: 0.3rem 1rem;
+            flex-shrink: 0;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo-hero-black {
+            font-size: 2.5rem;
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+            letter-spacing: -0.02em;
+            margin: 0;
+        }
+
+
+        .logo-hero-black .thin {
+            font-weight: 100;
+            color: #000000;
+        }
+
+        .logo-hero-black .bold {
+            font-weight: 1000;
+            color: #000000;
+        }
+
+        .header-status {
+            font-size: 14px;
+            color: var(--color-text);
+            font-weight: 700;
+            margin-left: auto;
+            text-align: right;
+            letter-spacing: 0.3px;
+        }
+
+        .status-indicator {
+            color: var(--color-success);
+            font-size: 1rem;
+        }
+
+        /* Main Layout */
+        #aladin-main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            overflow: hidden;
+            gap: 0;
+        }
+
+        .panel {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            height: 100%;
+        }
+
+        .panel-header {
+            background: var(--color-light);
+            border-bottom: 1px solid var(--color-border);
+            padding: 0.75rem 1rem;
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--color-secondary);
+            display: none;
+        }
+
+        /* Chat Panel */
+        #chat-panel {
+            border-right: 1px solid var(--color-border);
+            background: #ffffff;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        /* Status Section */
+        .status-section {
+            background: var(--color-light);
+            border-bottom: 1px solid var(--color-border);
+            padding: 0.75rem 1rem;
+        }
+
+        .agent-list {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .agent-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 20px;
+        }
+
+        .agent-name {
+            color: var(--color-text);
+            font-weight: 500;
+        }
+
+        .agent-status-dot {
+            font-size: 0.9rem;
+            transition: var(--transition);
+        }
+
+        /* Agent Status Colors */
+        .agent-item.ready .agent-status-dot {
+            color: var(--color-ready);
+        }
+
+        .agent-item.processing .agent-status-dot {
+            color: var(--color-processing);
+        }
+
+        .agent-item.complete .agent-status-dot {
+            color: var(--color-success);
+        }
+
+        .agent-item.error .agent-status-dot {
+            color: var(--color-error);
+        }
+
+        .agent-item.idle .agent-status-dot {
+            color: var(--color-idle);
+        }
+
+        /* Chat History */
+        .chat-section {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            min-height: 0;
+            background: white;
+        }
+
+        .chat-message {
+            padding: 0.875rem 1.125rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 0.5rem;
+            font-size: 15px;
+            line-height: 1.5;
+            max-width: 85%;
+            animation: fadeInUp 0.3s ease;
+            word-wrap: break-word;
+            position: relative;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .chat-message.user {
+            background: linear-gradient(135deg, var(--color-primary), #e11d48);
+            color: white !important;
+            margin-left: auto;
+            margin-right: 0;
+            box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
+            border-bottom-right-radius: 4px;
+            text-align: left;
+        }
+
+        .chat-message.assistant {
+            background: rgba(248, 249, 250, 0.9);
+            border: 1px solid rgba(233, 236, 239, 0.8);
+            margin-left: 0;
+            margin-right: auto;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            border-bottom-left-radius: 4px;
+        }
+
+        .chat-message.system {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            margin: 0.5rem auto;
+            text-align: center;
+            max-width: 95%;
+        }
+
+        /* Input Section */
+        .input-section {
+            border-top: 1px solid var(--color-border);
+            padding: 1rem;
+            background: var(--color-light);
+            flex-shrink: 0;
+            min-height: 80px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 0.75rem;
+            align-items: flex-end;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+
+        #chat-input {
+            flex: 1;
+            width: 0;
+            min-width: 0;
+            padding: 0.875rem;
+            border: 1px solid var(--color-border);
+            border-radius: var(--border-radius);
+            font-family: var(--font-family);
+            font-size: 15px;
+            line-height: 1.4;
+            resize: none;
+            min-height: 45px;
+            max-height: 120px;
+            background: white;
+            transition: var(--transition);
+            box-sizing: border-box;
+        }
+
+        #chat-input:focus {
+            outline: none;
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.1);
+        }
+
+        #send-button {
+            padding: 0.875rem 1.5rem;
+            background: var(--color-primary);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            font-family: var(--font-family);
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            min-width: 80px;
+            height: 45px;
+            flex-shrink: 0;
+            box-sizing: border-box;
+        }
+
+        #send-button:hover {
+            background: #c82333;
+            box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
+        }
+
+        #send-button:disabled {
+            background: var(--color-secondary);
+            cursor: not-allowed;
+        }
+
+        /* Charts Panel */
+        #charts-panel {
+            background: #ffffff;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-content {
+            flex: 1;
+            padding: 0.5rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        /* Chart header with inline controls */
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            padding: 0 0.5rem;
+        }
+
+        .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--color-text);
+            margin: 0;
+        }
+
+        .chart-controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+
+
+        #price-chart-wrapper {
+            background: white;
+            border: 1px solid var(--color-border);
+            border-radius: var(--border-radius);
+            padding: 0.5rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            height: 450px;
+            position: relative;
+        }
+
+        #price-chart {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* Analysis Results */
+        #timeframe-selector {
+            padding: 0.25rem 0.5rem;
+            border: 1px solid var(--color-border);
+            border-radius: 4px;
+            font-size: 12px;
+            background: white;
+        }
+        /* Stagger annotation positions to avoid clogging */
+        .chart-annotation-stagger {
+            position: relative;
+        }
+
+        .chart-annotation-stagger:nth-child(odd) {
+            left: 10px;
+        }
+
+        .chart-annotation-stagger:nth-child(even) {
+            right: 10px;
+        }
+
+
+        /* Compact analysis results */
+        #analysis-results {
+            border-top: 1px solid var(--color-border);
+            padding: 0.75rem;
+            background: rgba(248, 249, 250, 0.5);
+            max-height: 200px; /* Reduced from 280px */
+            overflow-y: auto;
+        }
+
+        .analysis-summary {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+            margin-bottom: 1rem;
+        }
+
+        .analysis-summary h3 {
+            font-size: 18px;
+            margin-bottom: 1rem;
+            color: var(--color-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .analysis-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .analysis-meta p {
+            margin: 0;
+            padding: 0.5rem;
+            background: #f8f9fa;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .analysis-meta strong {
+            font-size: 0.85rem;
+            color: var(--color-secondary);
+            margin-bottom: 0.25rem;
+        }
+
+        .analysis-meta span {
+            font-weight: 600;
+            color: var(--color-text);
+        }
+
+        .level-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .support-badge {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .resistance-badge {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        /* Status Updates */
+        .status-update {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            border-radius: 5px;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+            transition: opacity 0.3s;
+        }
+
+        .status-info {
+            background: #007bff;
+        }
+
+        .status-success {
+            background: #28a745;
+        }
+
+        .status-error {
+            background: #dc3545;
+        }
+
+        .status-warning {
+            background: #ffc107;
+            color: #333;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 968px) {
+            #aladin-main {
+                grid-template-columns: 1fr;
+            }
+            
+            #chat-panel {
+                border-right: none;
+                border-bottom: 1px solid var(--color-border);
+                height: 40vh;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                gap: 0.2rem;
+                text-align: center;
+            }
+            
+            .logo-hero-black {
+                font-size: 2.8rem;
+            }
+            
+            .header-status {
+                font-size: 12px;
+                text-align: center;
+                margin-left: 0;
+                letter-spacing: 0.2px;
+            }
+            
+            .agent-list {
+                gap: 1rem;
+            }
+            
+            .agent-name {
+                font-size: 14px;
+            }
+            
+            .input-section {
+                padding: 0.75rem;
+            }
+            
+            #chat-input {
+                font-size: 16px;
+            }
+            
+            .chat-message {
+                max-width: 95%;
+            }
+
+            #price-chart-wrapper {
+                height: 350px;
+            }
+            .chart-header {
+                flex-direction: column;
+                gap: 0.5rem;
+                align-items: flex-start;
+            }
+        
+
+            .analysis-meta {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Loading Animation */
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Debug Panel */
+        .debug-panel {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 10000;
+            max-width: 400px;
+            max-height: 200px;
+            overflow: auto;
+            display: none;
+        }
+
+        .debug-toggle {
+            position: fixed;
+            bottom: 10px;
+            right: 420px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .data-mapping {
+            margin-top: 10px;
+            padding: 10px;
+            background: #2c3e50;
+            border-radius: 5px;
+        }
+
+        .data-mapping h5 {
+            margin: 0 0 8px 0;
+            color: #1abc9c;
+        }
+
+        .field-mapping {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+            font-size: 11px;
+        }
+
+        .field-name {
+            color: #3498db;
+        }
+
+        .field-value {
+            color: #e74c3c;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        /* Enhanced Styles for Analysis Summary */
+        
+        /* Enhanced Analysis Summary Styles */
+        .levels-section {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 3px solid #007bff;
+        }
+
+        .levels-section h4 {
+            margin: 0 0 0.75rem 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .level-detail {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .level-strength {
+            font-size: 0.75rem;
+            padding: 0.125rem 0.375rem;
+            border-radius: 3px;
+            background: #e9ecef;
+            color: #495057;
+            font-weight: 500;
+        }
+
+        .level-desc {
+            font-size: 0.75rem;
+            color: #6c757d;
+            font-style: italic;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Enhanced Chart Annotations */
+        .chart-annotation-label {
+            font-size: 10px !important;
+            font-weight: bold !important;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+
+        /* Status indicators */
+        .status-processing {
+            color: #ffc107;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Enhanced loading states */
+        .chart-loading {
+            position: relative;
+        }
+
+        .chart-loading::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(248, 249, 250, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .chart-loading::after {
+            content: 'Loading chart data...';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 11;
+            font-weight: 500;
+            color: #495057;
+        }
+
+
+
+    </style>
+</head>
+<body>
+    <div id="aladin-container">
+        <!-- Header -->
+        <header id="aladin-header">
+            <div class="header-content">
+                <h1 class="logo-hero-black">
+                    <span class="thin">al</span><span class="bold">a</span><span class="thin">d</span><span class="bold">i</span><span class="thin">n</span>
+                </h1>
+                <div class="header-content">
+                    Advanced Logic & Analysis Dashboard for Investment Navigation
+                </div>
+                <div class="header-status">
+                    <span id="system-status" class="status-indicator">â—</span>
+                    <span id="session-info">Session: <span id="session-id">--</span></span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main id="aladin-main">
+            <!-- Chat Panel (Left) -->
+            <section id="chat-panel" class="panel">
+                <!-- Agent Status -->
+                <div id="agent-status" class="status-section">
+                    <div class="agent-list">
+                        <div class="agent-item" data-agent="data">
+                            <span class="agent-name">Data</span>
+                            <span class="agent-status-dot" id="data-status">â—</span>
+                        </div>
+                        <div class="agent-item" data-agent="tools">
+                            <span class="agent-name">Tools</span>
+                            <span class="agent-status-dot" id="tools-status">â—</span>
+                        </div>
+                        <div class="agent-item" data-agent="analysis">
+                            <span class="agent-name">Analysis</span>
+                            <span class="agent-status-dot" id="analysis-status">â—</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat History -->
+                <div id="chat-history" class="chat-section">
+                    <!-- Messages will be added here dynamically -->
+                </div>
+
+                <!-- Chat Input -->
+                <div id="chat-input-section" class="input-section">
+                    <div class="input-container">
+                        <textarea 
+                            id="chat-input" 
+                            placeholder="Try: 'analyze BPCL' or 'compare VOLTAMP with sector'" 
+                            rows="1"></textarea>
+                        <button id="send-button" type="button">Send</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Charts Panel (Right) -->
+            <section id="charts-panel" class="panel">
+                <div class="panel-header">
+                    <h2>Interactive Charts</h2>
+                    <div class="chart-controls">
+                        <select id="timeframe-selector">
+                            <option value="7">1 Week</option>
+                            <option value="30" selected>1 Month</option>
+                            <option value="90">3 Months</option>
+                            <option value="180">6 Months</option>
+                            <option value="365">1 Year</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Chart Container -->
+                <div id="chart-container" class="chart-content" style="display: none;">
+                    <div id="price-chart-wrapper">
+                            <div class="chart-header">
+                                <h3 class="chart-title" id="dynamic-chart-title">${symbol} Price Chart (${this.currentTimeframe} days)</h3>
+                                <div class="chart-controls">
+                                    <select id="timeframe-selector">
+                                        <option value="7">1 Week</option>
+                                        <option value="30" selected>1 Month</option>
+                                        <option value="90">3 Months</option>
+                                        <option value="180">6 Months</option>
+                                        <option value="365">1 Year</option>
+                                    </select>
+                                </div>
+                            </div>
+                        <canvas id="price-chart"></canvas>
+                    </div>
+                    <div id="analysis-results">
+                        <div id="insights-container">
+                            Analysis results will appear here
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chart Placeholder -->
+                <div id="chart-placeholder" class="chart-content">
+                    <div style="text-align: center; padding: 2rem; color: #6b7280;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">ðŸ“Š</div>
+                        <h3>No Chart Data</h3>
+                        <p>Charts will appear automatically when analysis completes</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <button class="debug-toggle" onclick="toggleDebug()">Toggle Debug</button>
+    <div class="debug-panel" id="debug-panel">
+        <h4>Debug Information</h4>
+        <div id="debug-content"></div>
+    </div>
+
+    <script>
+        // Enhanced ALADIN client with improved visualization
+        class ALADINStreamingClient {
+            constructor() {
+                this.sessionId = null;
+                this.isProcessing = false;
+                this.eventSource = null;
+                this.currentSymbol = null;
+                this.priceChart = null;
+                this.analysisData = null;
+                this.currentWorkflowSymbol = null; 
+                this.currentTimeframe = 30; // Default to 30 days
+                
+                // Configuration
+                this.config = {
+                    apiEndpoint: '/api/aladin/chat',
+                    streamTimeout: 30000,
+                    retryAttempts: 3,
+                    retryDelay: 2000
+                };
+                
+                // Initialize when DOM is ready
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', () => this.initializeApp());
+                } else {
+                    this.initializeApp();
+                }
+            }
+
+            initializeApp() {
+                console.log('ðŸŽ¯ ALADIN Streaming Client - Initializing with enhanced visualization...');
+                
+                this.generateSessionId();
+                this.initializeUIElements();
+                this.setupEventListeners();
+                this.updateSessionInfo();
+                this.setSystemStatus('ready');
+                
+                // Add welcome message
+                this.addChatMessage("Welcome to ALADIN! Try asking me to 'analyze BPCL' or any other stock symbol.", 'assistant');
+                
+                console.log('âœ… ALADIN initialization complete');
+                console.log(`ðŸ“± Session ID: ${this.sessionId}`);
+            }
+
+            generateSessionId() {
+                const timestamp = Date.now();
+                const randomPart = Math.random().toString(36).substr(2, 8);
+                this.sessionId = `web_${timestamp}_${randomPart}`;
+            }
+
+            initializeUIElements() {
+                this.chatInput = document.getElementById('chat-input');
+                this.sendButton = document.getElementById('send-button');
+                this.chatHistory = document.getElementById('chat-history');
+                this.sessionDisplay = document.getElementById('session-id');
+                this.systemStatus = document.getElementById('system-status');
+                this.timeframeSelector = document.getElementById('timeframe-selector');
+                
+                // Initialize agent status elements
+                this.dataStatus = document.getElementById('data-status');
+                this.toolsStatus = document.getElementById('tools-status');
+                this.analysisStatus = document.getElementById('analysis-status');
+                
+                if (!this.chatInput || !this.sendButton || !this.chatHistory) {
+                    console.error('âŒ Required chat elements not found');
+                    this.showSystemMessage('Interface initialization failed', 'error');
+                }
+                
+                // Set initial agent status
+                this.setAgentStatus('data', 'ready');
+                this.setAgentStatus('tools', 'ready');
+                this.setAgentStatus('analysis', 'ready');
+                
+                console.log('âœ… UI elements initialized');
+            }
+
+            setupEventListeners() {
+                this.chatInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        this.sendMessage();
+                    }
+                });
+                
+                this.sendButton.addEventListener('click', () => {
+                    this.sendMessage();
+                });
+                
+                this.chatInput.addEventListener('input', () => {
+                    this.chatInput.style.height = 'auto';
+                    this.chatInput.style.height = Math.min(this.chatInput.scrollHeight, 120) + 'px';
+                });
+                
+                // Timeframe selector change event
+                if (this.timeframeSelector) {
+                    this.timeframeSelector.addEventListener('change', (e) => {
+                        this.currentTimeframe = parseInt(e.target.value);
+                        if (this.currentSymbol) {
+                            this.loadAnalysisVisualization(this.currentSymbol);
+                        }
+                    });
+                }
+                
+                this.chatInput.focus();
+                console.log('âœ… Event listeners attached');
+            }
+
+            updateSessionInfo() {
+                if (this.sessionDisplay) {
+                    this.sessionDisplay.textContent = this.sessionId.substr(-8);
+                }
+            }
+
+            setSystemStatus(status) {
+                if (!this.systemStatus) return;
+                
+                this.systemStatus.classList.remove('ready', 'processing', 'error');
+                this.systemStatus.classList.add(status);
+                
+                const statusMap = {
+                    'ready': 'â—',
+                    'processing': 'âš¡',
+                    'error': 'âš ï¸'
+                };
+                
+                this.systemStatus.textContent = statusMap[status] || 'â—';
+            }
+
+            setAgentStatus(agent, status) {
+                const agentElement = document.querySelector(`.agent-item[data-agent="${agent}"]`);
+                if (!agentElement) return;
+                
+                // Remove all status classes
+                agentElement.classList.remove('ready', 'processing', 'complete', 'error', 'idle');
+                
+                // Add the current status class
+                agentElement.classList.add(status);
+                
+                console.log(`âœ… Agent ${agent} status set to: ${status}`);
+            }
+
+            addChatMessage(content, sender = 'assistant', type = 'normal') {
+                if (!this.chatHistory) return;
+                
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `chat-message ${sender}`;
+                
+                if (type !== 'normal') {
+                    messageDiv.classList.add(type);
+                }
+                
+                if (sender === 'user') {
+                    messageDiv.innerHTML = `<strong>You:</strong> ${this.escapeHtml(content)}`;
+                } else if (sender === 'system') {
+                    messageDiv.innerHTML = content;
+                } else {
+                    messageDiv.innerHTML = this.formatAssistantMessage(content);
+                }
+                
+                const timestamp = new Date().toLocaleTimeString();
+                messageDiv.setAttribute('data-timestamp', timestamp);
+                
+                this.chatHistory.appendChild(messageDiv);
+                this.scrollToBottom();
+                
+                return messageDiv;
+            }
+
+            formatAssistantMessage(content) {
+                return `<strong>ðŸ¤– ALADIN:</strong> ${this.escapeHtml(content)}`;
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            scrollToBottom() {
+                if (this.chatHistory) {
+                    this.chatHistory.scrollTop = this.chatHistory.scrollHeight;
+                }
+            }
+
+            showSystemMessage(message, type = 'system') {
+                this.addChatMessage(message, 'system', type);
+            }
+
+            // ============================================================================
+            // NEW: Single backend communication method
+            // ============================================================================
+
+            async sendToBackend(message) {
+                try {
+                    const response = await fetch(this.config.apiEndpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'text/event-stream, application/json'  // Accept both
+                        },
+                        body: JSON.stringify({
+                            message: message,
+                            session_id: this.sessionId
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const contentType = response.headers.get('content-type');
+                    console.log('ðŸ“„ Backend response type:', contentType);
+                    
+                    // âœ… BACKEND DECIDES: Check what the backend returned
+                    if (contentType && contentType.includes('text/event-stream')) {
+                        console.log('ðŸŒŠ Backend chose streaming - setting up event source');
+                        this.setupEventSource(response);
+                    } else if (contentType && contentType.includes('application/json')) {
+                        console.log('ðŸ’¬ Backend chose JSON - handling regular response');
+                        const data = await response.json();
+                        
+                        // âœ… CHECK: Does JSON response indicate workflow should start?
+                        if (data.type === 'analysis' && data.workflow_initiated) {
+                            console.log('ðŸŽ¯ JSON response indicates workflow started - wait for streaming');
+                            this.showSystemMessage('Analysis workflow started...', 'info');
+                            // Don't show the response text yet - wait for workflow updates
+                        } else {
+                            this.handleRegularResponse(data);
+                        }
+                    } else {
+                        console.warn('âš ï¸ Unexpected content type:', contentType);
+                        const text = await response.text();
+                        this.showSystemMessage(`Unexpected response: ${text}`, 'warning');
+                    }
+                    
+                } catch (error) {
+                    console.error('âŒ Backend communication error:', error);
+                    this.showSystemMessage(`Error: ${error.message}`, 'error');
+                    throw error;
+                }
+            }
+
+            async sendMessage() {
+                if (this.isProcessing || !this.chatInput) return;
+                
+                const message = this.chatInput.value.trim();
+                if (!message) return;
+                
+                console.log('ðŸš€ Sending message:', message);
+                this.addChatMessage(message, 'user');
+                
+                this.chatInput.value = '';
+                this.chatInput.style.height = 'auto';
+                this.setProcessingState(true);
+                
+                try {
+                    // Use the new backend communication method
+                    console.log('ðŸ“¡ Sending to backend for routing decision...');
+                    await this.sendToBackend(message);
+                    
+                } catch (error) {
+                    console.error('âŒ Send message error:', error);
+                    this.showSystemMessage(`Error: ${error.message}`, 'error');
+                } finally {
+                    this.setProcessingState(false);
+                }
+            }
+
+            setProcessingState(processing) {
+                this.isProcessing = processing;
+                
+                if (this.sendButton) {
+                    this.sendButton.disabled = processing;
+                    this.sendButton.textContent = processing ? 'Processing...' : 'Send';
+                }
+                
+                if (this.chatInput) {
+                    this.chatInput.disabled = processing;
+                }
+                
+                this.setSystemStatus(processing ? 'processing' : 'ready');
+            }
+
+
+            setupEventSource(response) {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                this.processStreamChunks(reader, decoder);
+            }
+
+            async processStreamChunks(reader, decoder) {
+                let buffer = '';
+                
+                try {
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        
+                        if (done) {
+                            console.log('âœ… Stream completed');
+                            break;
+                        }
+                        
+                        buffer += decoder.decode(value, { stream: true });
+                        
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || '';
+                        
+                        for (const line of lines) {
+                            this.processStreamLine(line);
+                        }
+                    }
+                } catch (error) {
+                    console.error('âŒ Stream processing error:', error);
+                    this.showSystemMessage(`Stream error: ${error.message}`, 'error');
+                }
+            }
+
+            processStreamLine(line) {
+                if (!line.trim()) return;
+                
+                if (line.startsWith('data: ')) {
+                    const dataStr = line.substring(6).trim();
+                    
+                    if (dataStr === '[DONE]') {
+                        console.log('âœ… Stream marked as complete');
+                        return;
+                    }
+                    
+                    try {
+                        const data = JSON.parse(dataStr);
+                        this.handleStreamUpdate(data);
+                    } catch (error) {
+                        console.warn('âš ï¸ Failed to parse stream data:', dataStr);
+                    }
+                }
+            }
+
+            // PATCH 1: Enhanced handleStreamUpdate method
+            // REPLACE the existing handleStreamUpdate method with this enhanced version
+            // Updated handleStreamUpdate method to handle 'load_chart' trigger
+            // REPLACE the handleStreamUpdate method in your aladin.html file
+
+            handleStreamUpdate(update) {
+                console.log('Stream update received:', update);
+                
+                try {
+                    // Store symbol from any event that provides it
+                    if (update.symbol) {
+                        this.currentWorkflowSymbol = update.symbol;
+                        console.log(`📍 Symbol stored: ${update.symbol}`);
+                    }
+                    
+                    // Handle workflow completion with analysis data loading
+                    if (update.type === 'workflow_complete' || 
+                        update.type === 'load_chart' ||
+                        (update.message && update.message.includes('✅') && 
+                        update.message.includes('workflow complete'))) {
+                        
+                        let symbol = null;
+                        
+                        // Priority 1: Direct symbol field
+                        if (update.symbol) {
+                            symbol = update.symbol;
+                            console.log(`🎯 Using direct symbol: ${symbol}`);
+                        }
+                        // Priority 2: Stored symbol from earlier events
+                        else if (this.currentWorkflowSymbol) {
+                            symbol = this.currentWorkflowSymbol;
+                            console.log(`🎯 Using stored symbol: ${symbol}`);
+                        }
+                        // Priority 3: Extract from message (fallback)
+                        else if (update.message) {
+                            symbol = this.extractSymbolFromMessage(update.message);
+                            console.log(`🎯 Extracted symbol from message: ${symbol}`);
+                        }
+                        
+                        if (symbol) {
+                            console.log(`🎯 Analysis complete detected for ${symbol}`);
+                            // Load both chart data and analysis visualization
+                            this.loadAnalysisVisualization(symbol);
+                            this.resetAgentStatus();
+                            
+                            // Clear stored symbol after use
+                            this.currentWorkflowSymbol = null;
+                        } else {
+                            console.warn('⚠️ Chart loading triggered but no symbol found');
+                            console.log('Debug - Update object:', update);
+                            this.showStatusUpdate('⚠️ Chart loading failed: No symbol provided', 'error');
+                        }
+                    }
+                    
+                    // Enhanced message handling
+                    if (update.message) {
+                        this.addChatMessage(update.message, 'assistant');
+                    }
+                    
+                    // Agent status updates
+                    if (update.agent_type || update.agent) {
+                        const agent = update.agent_type || update.agent;
+                        this.setAgentStatus(agent, update.status || 'processing');
+                    }
+                    
+                    // Handle different update types
+                    switch(update.type) {
+                        case 'agent_status':
+                            this.setAgentStatus(update.agent, update.status);
+                            break;
+                        case 'analysis_progress':
+                            this.showAnalysisProgress(update);
+                            break;
+                        case 'data_loaded':
+                            this.handleDataLoadComplete(update);
+                            break;
+                        case 'load_chart':
+                        case 'workflow_complete':
+                            // Already handled above in the main trigger logic
+                            this.showStatusUpdate('📊 Loading chart visualization...', 'info');
+                            break;
+                        case 'symbol_detected':
+                            // Symbol already stored above
+                            this.showStatusUpdate(`🔍 Analyzing ${update.symbol}...`, 'info');
+                            break;
+                    }
+                    
+                } catch (error) {
+                    console.error('Error handling stream update:', error);
+                    this.showStatusUpdate(`Stream error: ${error.message}`, 'error');
+                }
+            }
+
+            resetAgentStatus() {
+                ['data', 'tools', 'analysis'].forEach(agent => {
+                    this.setAgentStatus(agent, 'ready');
+                });
+            }
+
+            extractSymbolFromMessage(message) {
+                if (!message) return null;
+                
+                const match = message.match(/workflow complete for ([A-Z]+)/i) || 
+                            message.match(/Analysis workflow complete for ([A-Z]+)/i);
+                return match ? match[1] : null;
+            }
+
+
+            handleRegularResponse(data) {
+                console.log('ðŸ“¬ Regular response:', data);
+                
+                if (data.error) {
+                    this.showSystemMessage(data.error, 'error');
+                    return;
+                }
+                
+                const responseText = this.extractResponseText(data);
+                
+                if (responseText) {
+                    this.addChatMessage(responseText);
+                } else if (data.chat_response) {
+                    this.addChatMessage(data.chat_response);
+                } else if (data.message) {
+                    this.addChatMessage(data.message);
+                } else {
+                    this.addChatMessage('Response received but no message content found.');
+                }
+                
+                if (data.session_id && data.session_id !== this.sessionId) {
+                    this.sessionId = data.session_id;
+                    this.updateSessionInfo();
+                }
+            }
+
+            extractResponseText(data) {
+                const responseFields = [
+                    'chat_response',
+                    'response',
+                    'message',
+                    'result',
+                    'answer',
+                    'content',
+                    'text',
+                    'output'
+                ];
+                
+                for (const field of responseFields) {
+                    if (data[field] && typeof data[field] === 'string' && data[field].trim()) {
+                        console.log(`âœ… Found response in field '${field}'`);
+                        return data[field];
+                    }
+                }
+                
+                if (data.result && typeof data.result === 'object') {
+                    for (const field of responseFields) {
+                        if (data.result[field] && typeof data.result[field] === 'string') {
+                            console.log(`âœ… Found response in nested field 'result.${field}'`);
+                            return data.result[field];
+                        }
+                    }
+                }
+                
+                console.warn('âŒ No response text found in any field');
+                return null;
+            }
+
+            // Enhanced visualization methods
+            // PATCH 2: Enhanced loadAnalysisVisualization method  
+            // REPLACE the existing loadAnalysisVisualization method with this enhanced version
+            async loadAnalysisVisualization(symbol) {
+                try {
+                    this.currentSymbol = symbol;
+                    console.log(`ðŸ“Š Loading enhanced visualization for ${symbol}`);
+                    
+                    // Show loading state
+                    this.showStatusUpdate(`ðŸ“Š Loading analysis for ${symbol}`, 'info');
+                    this.setSystemStatus('processing');
+                    
+                    // Show chart container and hide placeholder
+                    const chartContainer = document.getElementById('chart-container');
+                    const chartPlaceholder = document.getElementById('chart-placeholder');
+                    // Add this to your loadAnalysisVisualization method after setting this.currentSymbol
+                    const titleElement = document.getElementById('dynamic-chart-title');
+                    if (titleElement) {
+                        titleElement.textContent = `${symbol} Price Chart (${this.currentTimeframe} days)`;
+                    }
+                    
+                    if (chartContainer) chartContainer.style.display = 'block';
+                    if (chartPlaceholder) chartPlaceholder.style.display = 'none';
+                    
+                    // Fetch latest analysis data from app2
+                    console.log('ðŸ” Fetching latest analysis data...');
+                    const analysisResponse = await fetch(`/api/aladin/analysis/${symbol}/latest`);
+                    const analysisResult = await analysisResponse.json();
+                    
+                    if (analysisResult.success && analysisResult.data) {
+                        this.analysisData = analysisResult.data;
+                        this.alignChartTimeframe();
+
+                        console.log('ðŸ“‹ Analysis data loaded:', this.analysisData);
+                        
+                        // Extract chart visualization data if available
+                        if (this.analysisData.chart_visualization_data) {
+                            this.chartVisualizationData = this.analysisData.chart_visualization_data;
+                            console.log('ðŸ“Š Chart visualization data found:', this.chartVisualizationData);
+                        }
+                    } else {
+                        console.warn('âš ï¸ No analysis data found, will show basic chart');
+                    }
+                    
+                    // Fetch OHLCV data for chart
+                    console.log('ðŸ“ˆ Fetching OHLCV data...');
+                    const ohlcvResponse = await fetch(`/api/aladin/chart/${symbol}/ohlcv?days=${this.currentTimeframe}`);
+                    const ohlcvResult = await ohlcvResponse.json();
+                    
+                    if (ohlcvResult.success && ohlcvResult.data && ohlcvResult.data.length > 0) {
+                        console.log(`ðŸ“ˆ OHLCV data loaded: ${ohlcvResult.data.length} points`);
+                        
+                        // Create enhanced price chart with analysis annotations
+                        this.createEnhancedPriceChart(ohlcvResult.data, symbol);
+                        
+                        // Display comprehensive analysis summary
+                        this.displayEnhancedAnalysisSummary();
+                        
+                        this.showStatusUpdate(`âœ… Enhanced chart loaded for ${symbol}`, 'success');
+                        this.setSystemStatus('ready');
+                        
+                    } else {
+                        console.error('âŒ No OHLCV data available:', ohlcvResult.error);
+                        this.showStatusUpdate(`âŒ No price data for ${symbol}`, 'error');
+                        this.setSystemStatus('error');
+                    }
+                    
+                } catch (error) {
+                    console.error('âŒ Error loading enhanced visualization:', error);
+                    this.showStatusUpdate(`âŒ Visualization failed: ${error.message}`, 'error');
+                    this.setSystemStatus('error');
+                }
+            }
+
+            //
+            
+            // REPLACE with this simple redirect method:
+            createPriceChart(ohlcvData, symbol) {
+                // Redirect to enhanced version
+                return this.createEnhancedPriceChart(ohlcvData, symbol);
+            }
+            // PATCH 3: Enhanced createPriceChart method (renamed to createEnhancedPriceChart)
+            // ADD this new method alongside your existing createPriceChart
+            // REPLACE your createEnhancedPriceChart method with this volume-enabled version
+            createEnhancedPriceChart(ohlcvData, symbol) {
+                const ctx = document.getElementById('price-chart');
+                
+                if (!ctx) {
+                    console.error('Price chart canvas not found');
+                    return;
+                }
+                
+                if (this.priceChart) {
+                    this.priceChart.destroy();
+                }
+                
+                const processedData = this.processOHLCVData(ohlcvData);
+                
+                if (processedData.length === 0) {
+                    console.error('No valid data points after processing');
+                    this.showStatusUpdate('No valid chart data', 'error');
+                    return;
+                }
+                
+                processedData.sort((a, b) => a.x - b.x);
+                
+                // Prepare price and volume data
+                const priceData = processedData.map(d => ({x: d.x, y: d.c}));
+                const volumeData = processedData.map(d => ({x: d.x, y: d.v || 0}));
+                
+                this.priceChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        datasets: [{
+                            label: `${symbol} Price`,
+                            data: priceData,
+                            borderColor: '#dc3545',
+                            backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                            fill: true,
+                            tension: 0.1,
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
+                            pointBackgroundColor: '#dc3545',
+                            pointBorderColor: '#ffffff',
+                            pointBorderWidth: 2,
+                            yAxisID: 'price'
+                        }, {
+                            label: `${symbol} Volume`,
+                            type: 'bar',
+                            data: volumeData,
+                            backgroundColor: 'rgba(139, 35, 35, 0.6)', // Darker red
+                            borderColor: '#8b2323',
+                            borderWidth: 0,
+                            yAxisID: 'volume'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: {
+                                    unit: 'day',
+                                    tooltipFormat: 'MMM dd, yyyy',
+                                    displayFormats: { day: 'MMM dd' }
+                                },
+                                title: { display: true, text: 'Date', font: { size: 12, weight: 'bold' } },
+                                grid: { color: 'rgba(0, 0, 0, 0.1)' },
+                                ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }
+                            },
+                            price: {
+                                type: 'linear',
+                                position: 'right',
+                                title: { display: true, text: 'Price (₹)', font: { size: 12, weight: 'bold' } },
+                                grid: { color: 'rgba(0, 0, 0, 0.1)' }
+                            },
+                            volume: {
+                                type: 'linear',
+                                position: 'left',
+                                title: { display: true, text: 'Volume', font: { size: 10 } },
+                                grid: { display: false },
+                                ticks: { 
+                                    display: false,
+                                    callback: function(value) {
+                                        return value.toLocaleString();
+                                    }
+                                },
+                                max: function(context) {
+                                    const volumes = volumeData.map(d => d.y).filter(v => v > 0);
+                                    return Math.max(...volumes) * 4; // Scale volume to bottom 25% of chart
+                                }
+                            }
+                        },
+                        plugins: {
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                callbacks: {
+                                    label: function(context) {
+                                        if (context.datasetIndex === 0) {
+                                            return `Price: ₹${context.parsed.y.toFixed(2)}`;
+                                        } else {
+                                            return `Volume: ${context.parsed.y.toLocaleString()}`;
+                                        }
+                                    }
+                                }
+                            },
+                            legend: { display: true, position: 'top' }
+                        },
+                        interaction: { mode: 'nearest', axis: 'x', intersect: false }
+                    }
+                });
+                
+                this.addAnalysisAnnotations();
+            }
+
+
+
+            // Helper to skip gaps in trading data (weekends, holidays)
+            skipMissingData(ctx, defaultValue) {
+                if (!ctx.p0 || !ctx.p1) return defaultValue;
+                
+                const prevPoint = ctx.p0.parsed;
+                const currentPoint = ctx.p1.parsed;
+                
+                if (!prevPoint || !currentPoint) return defaultValue;
+                
+                // If gap between points is more than 1.5 days, it's likely a market closure
+                const gap = currentPoint.x - prevPoint.x;
+                const dayInMs = 24 * 60 * 60 * 1000;
+                
+                if (gap > 1.5 * dayInMs) {
+                    return 'transparent';
+                }
+                return defaultValue;
+            }
+
+            // PATCH 5: Enhanced analysis annotations method
+            // Enhanced Chart Annotations Patch - Replace addAnalysisAnnotations method
+
+            addAnalysisAnnotations() {
+                if (!this.priceChart || !this.chartVisualizationData) return;
+                
+                console.log('Adding enhanced visual annotations...');
+                
+                const data = this.chartVisualizationData;
+                const currentPrice = parseFloat(data.current_price || 0);
+                
+                // Initialize annotations
+                if (!this.priceChart.options.plugins) {
+                    this.priceChart.options.plugins = {};
+                }
+                if (!this.priceChart.options.plugins.annotation) {
+                    this.priceChart.options.plugins.annotation = { annotations: {} };
+                }
+                
+                let annotationCount = 0;
+                
+                // Support levels as color-coded horizontal lines
+                if (data.support_levels?.length) {
+                    data.support_levels.forEach((level, i) => {
+                        const price = level.price || level;
+                        const strength = level.strength || 'medium'; // Default to medium if not specified
+                        
+                        // Define colors based on strength
+                        let borderColor, backgroundColor;
+                        switch(strength) {
+                            case 'strong':
+                                borderColor = '#1b5e20';  // Dark green
+                                backgroundColor = 'rgba(27, 94, 32, 0.8)';
+                                break;
+                            case 'weak':
+                                borderColor = '#81c784';  // Light green
+                                backgroundColor = 'rgba(129, 199, 132, 0.8)';
+                                break;
+                            case 'medium':
+                            default:
+                                borderColor = '#43a047';  // Medium green
+                                backgroundColor = 'rgba(67, 160, 71, 0.8)';
+                                break;
+                        }
+                        
+                        if (!isNaN(price)) {
+                            this.priceChart.options.plugins.annotation.annotations[`support-${i}`] = {
+                                type: 'line',
+                                mode: 'horizontal',
+                                scaleID: 'y',
+                                value: price,
+                                borderColor: borderColor,
+                                borderWidth: strength === 'strong' ? 3 : 2,
+                                borderDash: strength === 'strong' ? [] : [5, 5],
+                                label: {
+                                    display: true,
+                                    content: `S${i+1}: â‚¹${price}`,
+                                    position: 'end',  // Use 'end' instead of 'right'
+                                    backgroundColor: backgroundColor,
+                                    color: 'white',
+                                    xAdjust: -10  // Adjust position slightly from the edge
+                                }
+                            };
+                            annotationCount++;
+                        }
+                    });
+                }
+                // Resistance levels as color-coded horizontal lines
+                if (data.resistance_levels?.length) {
+                    data.resistance_levels.forEach((level, i) => {
+                        const price = level.price || level;
+                        const strength = level.strength || 'medium'; // Default to medium if not specified
+                        
+                        // Define colors based on strength
+                        let borderColor, backgroundColor;
+                        switch(strength) {
+                            case 'strong':
+                                borderColor = '#b71c1c';  // Dark red
+                                backgroundColor = 'rgba(183, 28, 28, 0.8)';
+                                break;
+                            case 'weak':
+                                borderColor = '#ef9a9a';  // Light red
+                                backgroundColor = 'rgba(239, 154, 154, 0.8)';
+                                break;
+                            case 'medium':
+                            default:
+                                borderColor = '#e53935';  // Medium red
+                                backgroundColor = 'rgba(229, 57, 53, 0.8)';
+                                break;
+                        }
+                        
+                        if (!isNaN(price)) {
+                            this.priceChart.options.plugins.annotation.annotations[`resistance-${i}`] = {
+                                type: 'line',
+                                mode: 'horizontal',
+                                scaleID: 'y',
+                                value: price,
+                                borderColor: borderColor,
+                                borderWidth: strength === 'strong' ? 3 : 2,
+                                borderDash: strength === 'strong' ? [] : [5, 5],
+                                label: {
+                                    display: true,
+                                    content: `R${i+1}: â‚¹${price}`,
+                                    position: 'end',  // Right aligned
+                                    backgroundColor: backgroundColor,
+                                    color: strength === 'weak' ? 'black' : 'white',
+                                    xAdjust: -10  // Adjust position slightly from the edge
+                                }
+                            };
+                            annotationCount++;
+                        }
+                    });
+                }
+                
+                // Add entry point annotation to the projection line
+            // REPLACE with:
+            if (data.entry_points?.length) {
+                // Get current time from chart data
+                const chartData = this.priceChart.data.datasets[0].data;
+                const currentTime = chartData[chartData.length - 1]?.x || Date.now();
+                
+                data.entry_points.forEach((entry, i) => {
+                    const entryPrice = entry.price || ((entry.range_min + entry.range_max) / 2);
+                    if (!isNaN(entryPrice)) {
+                        // Calculate position along the projection line (midpoint)
+                        const midTime = currentTime + (15 * 24 * 60 * 60 * 1000); // 15 days future
+                            this.priceChart.options.plugins.annotation.annotations[`entry-${i}`] = {
+                                type: 'point',
+                                xValue: midTime,
+                                yValue: entryPrice,
+                                backgroundColor: 'rgba(30, 144, 255, 0.8)', // Dodger blue shade
+                                borderColor: 'white',
+                                borderWidth: 2,
+                                radius: 6,
+                                label: {
+                                    display: true,
+                                    content: `Entry: â‚¹${entryPrice}`,
+                                    position: 'bottom',
+                                    backgroundColor: 'rgba(30, 144, 255, 0.9)',
+                                    color: 'white',
+                                    font: {
+                                        size: 11,
+                                        weight: 'bold'
+                                    },
+                                    padding: 6,
+                                    borderRadius: 4
+                                }
+                            };
+                            annotationCount++;
+                        }
+                    });
+                }
+
+                // Floor/Ceiling as thick lines
+                if (data.floor_ceiling_levels) {
+                    const floor = data.floor_ceiling_levels.buying_floor;
+                    const ceiling = data.floor_ceiling_levels.selling_ceiling;
+                    
+                    if (floor?.price) {
+                        this.priceChart.options.plugins.annotation.annotations['floor'] = {
+                            type: 'line',
+                            mode: 'horizontal',
+                            scaleID: 'y',
+                            value: floor.price,
+                            borderColor: '#006400',
+                            borderWidth: 4,
+                            label: {
+                                display: true,
+                                content: `FLOOR: â‚¹${floor.price}`,
+                                position: 'start',
+                                backgroundColor: 'rgba(0, 100, 0, 0.9)',
+                                color: 'white',
+                                font: { weight: 'bold' }
+                            }
+                        };
+                        annotationCount++;
+                    }
+                    
+                    if (ceiling?.price) {
+                        this.priceChart.options.plugins.annotation.annotations['ceiling'] = {
+                            type: 'line',
+                            mode: 'horizontal',
+                            scaleID: 'y',
+                            value: ceiling.price,
+                            borderColor: '#8b0000',
+                            borderWidth: 4,
+                            label: {
+                                display: true,
+                                content: `CEILING: â‚¹${ceiling.price}`,
+                                position: 'start',
+                                backgroundColor: 'rgba(139, 0, 0, 0.9)',
+                                color: 'white',
+                                font: { weight: 'bold' }
+                            }
+                        };
+                        annotationCount++;
+                    }
+                }
+                
+                // Entry zones as shaded boxes
+                if (data.entry_points?.length) {
+                    data.entry_points.forEach((entry, i) => {
+                        if (entry.range_min && entry.range_max) {
+                            this.priceChart.options.plugins.annotation.annotations[`entry-${i}`] = {
+                                type: 'box',
+                                xMin: this.priceChart.scales.x.min,
+                                xMax: this.priceChart.scales.x.max,
+                                yMin: entry.range_min,
+                                yMax: entry.range_max,
+                                backgroundColor: 'rgba(0, 123, 255, 0.15)',
+                                borderColor: 'rgba(0, 123, 255, 0.4)',
+                                borderWidth: 1
+                            };
+                            annotationCount++;
+                        }
+                    });
+                }
+                
+                // Add future projection line if targets exist
+                this.addFutureProjection();
+                
+                this.priceChart.update();
+                console.log(`Added ${annotationCount} annotations to chart`);
+            }
+
+            // Future projection method
+            // REPLACE your existing addFutureProjection() method with this:
+            addFutureProjection() {
+                console.log('Adding future projection from timeframe_outlook...');
+                
+                // Look for timeframe_outlook instead of targets
+                const outlookData = this.chartVisualizationData?.timeframe_outlook;
+                
+                if (!outlookData) {
+                    console.log('No timeframe_outlook data available');
+                    return;
+                }
+                
+                console.log('Timeframe outlook data:', outlookData);
+                
+                // Get target_timeframe from analysis data (e.g., "1_month")
+                const targetTimeframe = this.analysisData?.target_timeframe || '1_month';
+                console.log(`Looking for outlook data for: ${targetTimeframe}`);
+                
+                // Extract target price from the nested structure
+                const outlookEntry = outlookData[targetTimeframe];
+                
+                if (!outlookEntry) {
+                    console.log(`No outlook data found for timeframe: ${targetTimeframe}`);
+                    console.log(`Available timeframes:`, Object.keys(outlookData));
+                    return;
+                }
+                
+                const targetPrice = outlookEntry.target;
+                const probability = outlookEntry.probability || 50;
+                
+                if (!targetPrice || isNaN(targetPrice)) {
+                    console.log('Invalid target price:', targetPrice);
+                    return;
+                }
+                
+                console.log(`Target found: ₹${targetPrice} (${probability}% probability)`);
+                
+                // Get last price point from chart
+                const chartData = this.priceChart.data.datasets[0].data;
+                const lastDataPoint = chartData[chartData.length - 1];
+                const currentPrice = lastDataPoint.y;
+                const currentTime = lastDataPoint.x;
+                
+                // Calculate projection period
+                const projectionDays = this.parseTimeframeToDays(targetTimeframe);
+                const msPerDay = 24 * 60 * 60 * 1000;
+                const futureTime = currentTime + (projectionDays * msPerDay);
+                
+                console.log(`Projection: ₹${currentPrice} → ₹${targetPrice} over ${projectionDays} days`);
+                
+                // Extend X-axis to show projection area
+                this.priceChart.options.scales.x.max = futureTime;
+                
+                // Create projection line data
+                const projectionData = [
+                    { x: currentTime, y: currentPrice },
+                    { x: futureTime, y: targetPrice }
+                ];
+                
+                // Remove existing projection dataset if any
+                this.priceChart.data.datasets = this.priceChart.data.datasets.filter(d => 
+                    !d.label.includes('Target') && !d.label.includes('Projection')
+                );
+                
+                // Add new projection dataset
+                this.priceChart.data.datasets.push({
+                    label: `Target: ₹${targetPrice} (${probability}%)`,
+                    data: projectionData,
+                    borderColor: '#ff9500',
+                    borderWidth: 3,
+                    borderDash: [10, 5],
+                    pointRadius: [0, 8],
+                    pointBackgroundColor: ['transparent', '#ff9500'],
+                    pointBorderColor: ['transparent', '#ffffff'],
+                    pointBorderWidth: 3,
+                    fill: false,
+                    spanGaps: true,
+                    tension: 0
+                });
+                
+                // Update chart
+                this.priceChart.update('none');
+                
+                console.log('Projection line added successfully');
+            }
+
+            // Update chart title to show extended timeline
+            updateChartTitle() {
+                if (!this.priceChart) return;
+                
+                const hasProjection = this.chartVisualizationData?.targets?.length > 0;
+                const timeframeText = hasProjection ? 
+                    `${this.currentTimeframe} days + 30d projection` : 
+                    `${this.currentTimeframe} days`;
+                
+                this.priceChart.options.plugins.title.text = 
+                    `${this.currentSymbol} Enhanced Analysis (${timeframeText})`;
+            }
+
+
+            // PATCH 4: New method for processing OHLCV data
+            // ADD this new method
+            // Replace existing processOHLCVData with:
+            processOHLCVData(ohlcvData) {
+                // Apply gap removal first
+                const cleanedData = this.processOHLCVWithGapRemoval(ohlcvData);
+                
+                let processedData = [];
+                if (cleanedData.length > 0 && typeof cleanedData[0] === 'object') {
+                    processedData = cleanedData.map(item => ({
+                        x: new Date(item.timestamp),
+                        o: parseFloat(item.open) || null,
+                        h: parseFloat(item.high) || null,
+                        l: parseFloat(item.low) || null,
+                        c: parseFloat(item.close) || null,
+                        v: parseFloat(item.volume) || null
+                    })).filter(item => item.c !== null);
+                }
+                return processedData;
+            }
+
+            // PATCH 6: Enhanced analysis summary display
+            // REPLACE the existing displayAnalysisSummary method with this enhanced version
+            // REPLACE displayEnhancedAnalysisSummary with this streamlined version
+            displayEnhancedAnalysisSummary() {
+                const container = document.getElementById('insights-container');
+                if (!container || !this.analysisData) return;
+                
+                let html = '';
+                
+                // Executive Summary - direct content, no header
+                if (this.analysisData.executive_summary) {
+                    html += `<div class="analysis-content">${this.analysisData.executive_summary}</div>`;
+                }
+                
+                // Detailed Analysis - direct content, no header  
+                if (this.analysisData.detailed_analysis) {
+                    const formattedAnalysis = this.analysisData.detailed_analysis
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        .replace(/\n/g, '<br>');
+                    html += `<div class="analysis-content">${formattedAnalysis}</div>`;
+                }
+                
+                // Trading Recommendations - direct content, no header
+                if (this.analysisData.trading_recommendations) {
+                    const formattedRecs = this.analysisData.trading_recommendations
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        .replace(/\n/g, '<br>');
+                    html += `<div class="analysis-content">${formattedRecs}</div>`;
+                }
+                
+                // Timeframe Predictions - direct content, no header
+                if (this.analysisData.timeframe_predictions) {
+                    const formattedPredictions = this.analysisData.timeframe_predictions
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        .replace(/\n/g, '<br>');
+                    html += `<div class="analysis-content">${formattedPredictions}</div>`;
+                }
+                
+                container.innerHTML = html || '<div class="analysis-content">No analysis available</div>';
+            }
+
+
+            showStatusUpdate(message, type = 'info') {
+                // Create or update status message
+                let statusDiv = document.getElementById('chart-status');
+                if (!statusDiv) {
+                    statusDiv = document.createElement('div');
+                    statusDiv.id = 'chart-status';
+                    statusDiv.className = `status-update status-${type}`;
+                    document.body.appendChild(statusDiv);
+                } else {
+                    statusDiv.className = `status-update status-${type}`;
+                }
+                
+                statusDiv.textContent = message;
+                statusDiv.style.opacity = '1';
+                
+                if (type !== 'error') {
+                    setTimeout(() => {
+                        if (statusDiv) statusDiv.style.opacity = '0';
+                    }, 3000);
+                }
+                
+                // Also add to debug panel
+                this.addDebugMessage(`${type.toUpperCase()}: ${message}`);
+            }
+
+            addDebugMessage(message) {
+                const debugPanel = document.getElementById('debug-content');
+                if (debugPanel) {
+                    const messageDiv = document.createElement('div');
+                    messageDiv.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                    debugPanel.appendChild(messageDiv);
+                    debugPanel.scrollTop = debugPanel.scrollHeight;
+                }
+            }
+
+            // Test method to verify chart functionality
+            testChartFunctionality() {
+                console.log('Testing chart functionality...');
+                
+                // Test with mock data that simulates market hours (9:15 AM to 3:30 PM)
+                const mockData = [];
+                const now = new Date();
+                
+                for (let i = 0; i < 20; i++) {
+                    const date = new Date(now);
+                    date.setDate(now.getDate() - (19 - i));
+                    
+                    // Only add data for weekdays (Mon-Fri)
+                    if (date.getDay() >= 1 && date.getDay() <= 5) {
+                        // Set time to market open
+                        date.setHours(9, 15, 0, 0);
+                        
+                        mockData.push({
+                            timestamp: date.toISOString(),
+                            open: 320 + Math.random() * 20,
+                            high: 325 + Math.random() * 10,
+                            low: 315 + Math.random() * 10,
+                            close: 322 + Math.random() * 15,
+                            volume: 10000 + Math.floor(Math.random() * 5000)
+                        });
+                    }
+                }
+                
+                this.createPriceChart(mockData, 'TEST');
+                this.addDebugMessage('Test chart created with mock market data');
+                
+                // Test with mock analysis data
+                this.analysisData = {
+                    current_price: 333.65,
+                    support_levels: [325, 320, 315],
+                    resistance_levels: [340, 345, 350],
+                    trend_direction: 'Bullish',
+                    action: 'BUY',
+                    conviction: 'High',
+                    target_price: 350,
+                    stop_loss: 320
+                };
+                
+                this.addChartAnnotations();
+                this.displayAnalysisSummary();
+                this.addDebugMessage('Test analysis annotations added');
+            }
+        
+            // FIND and REPLACE the basic addChartAnnotations method with:
+            addChartAnnotations() {
+                // Redirect to enhanced version
+                return this.addAnalysisAnnotations();
+            }
+            // FIND the basic displayAnalysisSummary method and REPLACE with:
+            displayAnalysisSummary() {
+                // Redirect to enhanced version
+                return this.displayEnhancedAnalysisSummary();
+            }
+
+            // PATCH 7: New API endpoint handler methods
+            // ADD these new methods to handle app2 integration
+
+            async fetchLatestAnalysis(symbol) {
+                try {
+                    const response = await fetch(`/api/aladin/analysis/${symbol}/latest`);
+                    const result = await response.json();
+                    
+                    if (result.success && result.data) {
+                        console.log(`Analysis data fetched for ${symbol}:`, result.data);
+                        return result.data;
+                    } else {
+                        console.warn(`No analysis data found for ${symbol}:`, result.error);
+                        return null;
+                    }
+                } catch (error) {
+                    console.error(`Error fetching analysis for ${symbol}:`, error);
+                    return null;
+                }
+            }
+
+            async fetchOHLCVData(symbol, days = null) {
+                try {
+                    const timeframe = days || this.currentTimeframe;
+                    const response = await fetch(`/api/aladin/chart/${symbol}/ohlcv?days=${timeframe}`);
+                    const result = await response.json();
+                    
+                    if (result.success && result.data && result.data.length > 0) {
+                        console.log(`OHLCV data fetched for ${symbol}: ${result.data.length} points`);
+                        return result.data;
+                    } else {
+                        console.warn(`No OHLCV data found for ${symbol}:`, result.error);
+                        return [];
+                    }
+                } catch (error) {
+                    console.error(`Error fetching OHLCV data for ${symbol}:`, error);
+                    return [];
+                }
+            }
+
+            // Gap Removal Patch - Add this method to ALADINStreamingClient class
+
+            processOHLCVWithGapRemoval(ohlcvData, gapThresholdDays = 3) {
+                if (!ohlcvData || ohlcvData.length < 2) return ohlcvData;
+                
+                const result = [];
+                const msPerDay = 24 * 60 * 60 * 1000;
+                const gapThreshold = gapThresholdDays * msPerDay;
+                
+                // Sort by timestamp
+                const sorted = [...ohlcvData].sort((a, b) => 
+                    new Date(a.timestamp) - new Date(b.timestamp)
+                );
+                
+                result.push(sorted[0]); // Add first point
+                
+                for (let i = 1; i < sorted.length; i++) {
+                    const prevTime = new Date(sorted[i-1].timestamp).getTime();
+                    const currentTime = new Date(sorted[i].timestamp).getTime();
+                    const gap = currentTime - prevTime;
+                    
+                    // If gap > threshold, add null point to break line
+                    if (gap > gapThreshold) {
+                        result.push({
+                            timestamp: new Date(prevTime + msPerDay).toISOString(),
+                            open: null, high: null, low: null, close: null, volume: null
+                        });
+                    }
+                    
+                    result.push(sorted[i]);
+                }
+                
+                return result;
+            }
+
+            // PATCH 2: Add timeframe alignment method after gap removal method
+            // REPLACE your existing alignChartTimeframe() method with this enhanced version
+            alignChartTimeframe() {
+                if (!this.analysisData) {
+                    console.warn('⚠️ No analysis data available for timeframe alignment');
+                    return;
+                }
+                
+                console.log('📊 Aligning chart timeframe with analysis data...');
+                console.log('📋 Analysis data keys:', Object.keys(this.analysisData));
+                
+                // Step 1: Extract analysis period (how many days of data were analyzed)
+                let analysisPeriodDays = 90; // default
+                
+                // PRIORITY 1: Use period_days from Intent Agent (most reliable)
+                if (this.analysisData.period_days) {
+                    analysisPeriodDays = parseInt(this.analysisData.period_days);
+                    console.log(`📊 Found period_days from intent: ${analysisPeriodDays}`);
+                } 
+                // PRIORITY 2: Calculate from analysis_timeframe mapping
+                else if (this.analysisData.analysis_timeframe) {
+                    analysisPeriodDays = this.parseTimeframeToDays(this.analysisData.analysis_timeframe);
+                    console.log(`📊 Parsed from analysis_timeframe: ${this.analysisData.analysis_timeframe} = ${analysisPeriodDays} days`);
+                }
+                // PRIORITY 3: Fallback to data points calculation
+                else if (this.analysisData.data_points_analyzed) {
+                    analysisPeriodDays = Math.ceil(this.analysisData.data_points_analyzed / 1.4);
+                    console.log(`📊 Calculated from data_points_analyzed: ${this.analysisData.data_points_analyzed} points = ${analysisPeriodDays} days`);
+                }
+                
+                // Step 2: Extract projection period (how far targets extend into future)
+                let projectionPeriodDays = 30; // default
+                
+                // Try to find projection period from multiple sources
+                if (this.analysisData.target_timeframe) {
+                    projectionPeriodDays = this.parseTimeframeToDays(this.analysisData.target_timeframe);
+                    console.log(`🎯 Found target_timeframe: ${this.analysisData.target_timeframe} = ${projectionPeriodDays} days`);
+                } else if (this.chartVisualizationData?.targets?.length > 0) {
+                    // Check if targets have timeframe information
+                    const firstTarget = this.chartVisualizationData.targets[0];
+                    if (firstTarget.timeframe) {
+                        projectionPeriodDays = this.parseTimeframeToDays(firstTarget.timeframe);
+                        console.log(`🎯 Found target timeframe: ${firstTarget.timeframe} = ${projectionPeriodDays} days`);
+                    }
+                } else {
+                    // Try to extract from timeframe_predictions text
+                    const predictions = this.analysisData.timeframe_predictions || '';
+                    projectionPeriodDays = this.extractProjectionFromText(predictions);
+                    console.log(`🎯 Extracted from timeframe_predictions: ${projectionPeriodDays} days`);
+                }
+                
+                // Step 3: Calculate total chart timeframe
+                const totalTimeframeDays = analysisPeriodDays + projectionPeriodDays;
+                
+                console.log(`📊 TIMEFRAME CALCULATION:`);
+                console.log(`   Analysis Period: ${analysisPeriodDays} days`);
+                console.log(`   Projection Period: ${projectionPeriodDays} days`);
+                console.log(`   Total Chart Period: ${totalTimeframeDays} days`);
+                console.log(`   Current Chart Period: ${this.currentTimeframe} days`);
+                
+                // Step 4: Update chart timeframe if different
+                if (totalTimeframeDays !== this.currentTimeframe) {
+                    const oldTimeframe = this.currentTimeframe;
+                    this.currentTimeframe = totalTimeframeDays;
+                    
+                    console.log(`🔄 Updating chart timeframe: ${oldTimeframe} -> ${this.currentTimeframe} days`);
+                    
+                    // Update timeframe selector UI
+                    const selector = document.getElementById('timeframe-selector');
+                    if (selector) {
+                        selector.value = this.currentTimeframe;
+                    }
+                    
+                    // Update chart title
+                    this.updateChartTitle();
+                    
+                    // Store projection info for chart creation
+                    this.projectionDays = projectionPeriodDays;
+                    this.analysisDays = analysisPeriodDays;
+                    
+                    return true; // Indicates timeframe was updated
+                }
+                
+                console.log('✅ Chart timeframe already aligned');
+                return false; // No update needed
+            }
+
+            // Helper method to extract projection period from text
+            extractProjectionFromText(text) {
+                if (!text) return 30; // default
+                
+                const textLower = text.toLowerCase();
+                
+                // Look for explicit timeframe mentions
+                if (textLower.includes('1 week') || textLower.includes('weekly')) return 7;
+                if (textLower.includes('2 week') || textLower.includes('biweekly')) return 14;
+                if (textLower.includes('1 month') || textLower.includes('monthly')) return 30;
+                if (textLower.includes('2 month')) return 60;
+                if (textLower.includes('3 month') || textLower.includes('quarterly')) return 90;
+                if (textLower.includes('6 month')) return 180;
+                if (textLower.includes('1 year') || textLower.includes('yearly')) return 365;
+                
+                // Look for specific day mentions
+                const dayMatch = text.match(/(\d+)\s*days?\b/i);
+                if (dayMatch) {
+                    const days = parseInt(dayMatch[1]);
+                    if (days > 0 && days < 1000) return days;
+                }
+                
+                return 30; // fallback
+            }
+
+            // Enhanced parseTimeframeToDays method
+            parseTimeframeToDays(timeframe) {
+                if (!timeframe) return 30;
+                
+                const timeframeLower = timeframe.toLowerCase();
+                
+                const mapping = {
+                    'intraday': 1,
+                    '1_week': 7, 'weekly': 7, 'week': 7,
+                    '2_weeks': 14, 'biweekly': 14,
+                    '1_month': 30, 'monthly': 30, 'month': 30,
+                    '2_months': 60,
+                    '3_months': 90, 'quarterly': 90, 'quarter': 90,
+                    '6_months': 180, 'half_yearly': 180,
+                    '1_year': 365, 'yearly': 365, 'annual': 365
+                };
+                
+                // Direct mapping
+                if (mapping[timeframeLower]) {
+                    return mapping[timeframeLower];
+                }
+                
+                // Pattern matching for variations
+                if (timeframeLower.includes('week')) return 7;
+                if (timeframeLower.includes('month')) return 30;
+                if (timeframeLower.includes('quarter')) return 90;
+                if (timeframeLower.includes('year')) return 365;
+                
+                // Try to parse numbers
+                const numberMatch = timeframeLower.match(/(\d+)/);
+                if (numberMatch) {
+                    const num = parseInt(numberMatch[1]);
+                    if (timeframeLower.includes('day')) return num;
+                    if (timeframeLower.includes('week')) return num * 7;
+                    if (timeframeLower.includes('month')) return num * 30;
+                    if (timeframeLower.includes('year')) return num * 365;
+                }
+                
+                console.warn(`⚠️ Unknown timeframe format: ${timeframe}, using default 30 days`);
+                return 30;
+            }
+
+            // Enhanced updateChartTitle method
+            updateChartTitle() {
+                if (!this.priceChart) return;
+                
+                // Build descriptive title
+                let titleText = `${this.currentSymbol} Analysis`;
+                
+                if (this.analysisDays && this.projectionDays) {
+                    titleText += ` (${this.analysisDays}d analysis + ${this.projectionDays}d projection)`;
+                } else {
+                    titleText += ` (${this.currentTimeframe} days)`;
+                }
+                
+                // Update chart title
+                if (!this.priceChart.options.plugins.title) {
+                    this.priceChart.options.plugins.title = { display: true };
+                }
+                
+                this.priceChart.options.plugins.title.text = titleText;
+                console.log(`📊 Chart title updated: ${titleText}`);
+            }
+
+            // Debug method to inspect analysis data
+            debugAnalysisTimeframe() {
+                if (!this.analysisData) {
+                    console.log('❌ No analysis data available');
+                    return;
+                }
+                
+                console.log('🔍 TIMEFRAME DEBUG INFO:');
+                console.log('📊 Raw analysis data keys:', Object.keys(this.analysisData));
+                
+                // Check all possible timeframe fields
+                const timeframeFields = [
+                    'analysis_timeframe', 'timeframe', 'target_timeframe', 
+                    'period_days', 'data_points_analyzed', 'timeframe_predictions'
+                ];
+                
+                timeframeFields.forEach(field => {
+                    const value = this.analysisData[field];
+                    console.log(`   ${field}: ${value} (${typeof value})`);
+                });
+                
+                if (this.chartVisualizationData) {
+                    console.log('🎯 Chart visualization data available');
+                    if (this.chartVisualizationData.targets) {
+                        console.log(`   Targets: ${this.chartVisualizationData.targets.length}`);
+                        this.chartVisualizationData.targets.forEach((target, i) => {
+                            console.log(`   Target ${i+1}: price=${target.price}, timeframe=${target.timeframe}`);
+                        });
+                    }
+                }
+            }
+
+            // Test method to validate timeframe alignment
+            testTimeframeAlignment() {
+                console.log('🧪 TESTING TIMEFRAME ALIGNMENT...');
+                
+                // Test with mock analysis data
+                this.analysisData = {
+                    period_days: 90,
+                    data_points_analyzed: 126, // 90 trading days
+                    analysis_timeframe: '3_months',
+                    target_timeframe: '1_month',
+                    timeframe_predictions: 'Based on 1 month outlook, targets expected within 30 days'
+                };
+                
+                this.chartVisualizationData = {
+                    targets: [
+                        { price: 350, timeframe: '1_month' },
+                        { price: 365, timeframe: '2_months' }
+                    ]
+                };
+                
+                console.log('📊 Mock data created, running alignment...');
+                const updated = this.alignChartTimeframe();
+                
+                console.log(`✅ Test complete. Timeframe updated: ${updated}`);
+                console.log(`   Final timeframe: ${this.currentTimeframe} days`);
+                console.log(`   Analysis period: ${this.analysisDays} days`);
+                console.log(`   Projection period: ${this.projectionDays} days`);
+            }
+
+            // PATCH 8: Progress handling methods
+            // ADD these methods for enhanced progress tracking
+
+            showAnalysisProgress(update) {
+                if (update.stage) {
+                    const stages = {
+                        'data_loading': 'Loading market data...',
+                        'analysis_running': 'Running technical analysis...',
+                        'chart_generation': 'Generating chart data...',
+                        'finalization': 'Finalizing results...'
+                    };
+                    
+                    const message = stages[update.stage] || 'Processing...';
+                    this.showStatusUpdate(`Processing: ${message}`, 'info');
+                }
+            }
+
+            handleDataLoadComplete(update) {
+                if (update.symbol && update.data_points) {
+                    this.showStatusUpdate(`Data loaded: ${update.data_points} points for ${update.symbol}`, 'success');
+                }
+            }
+        }
+
+
+
+
+
+        // Initialize the app
+        window.aladinApp = new ALADINStreamingClient();
+
+        // Debug functions
+        function toggleDebug() {
+            const debugPanel = document.getElementById('debug-panel');
+            debugPanel.style.display = debugPanel.style.display === 'none' ? 'block' : 'none';
+        }
+
+        // Expose functions for testing
+        window.ALADIN = {
+            app: window.aladinApp,
+            testChart: () => window.aladinApp.testChartFunctionality(),
+            testStreaming: () => {
+                window.aladinApp.chatInput.value = 'analyze TEST';
+                window.aladinApp.sendMessage();
+            }
+        };
+
+        console.log('ðŸŽ¯ ALADIN Enhanced Visualization loaded');
+    </script>
+</body>
+</html>

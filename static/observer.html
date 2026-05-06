@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alaidin — Observer Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@800;900&display=swap" rel="stylesheet">
+<style>
+:root { --k:#111111; --y:#F5C518; --g:#666666; --r:#ef4444; --b:#2563eb; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body {
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  background:#f8f8f6;
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.card {
+  background:#fff;
+  border:2px solid var(--k);
+  border-radius:4px;
+  width:380px;
+  padding:40px 36px;
+}
+.logo {
+  font-family:'Nunito',system-ui,sans-serif;
+  font-size:22px;
+  font-weight:900;
+  letter-spacing:-0.5px;
+  margin-bottom:4px;
+  text-align:center;
+}
+.logo span { color:var(--y); }
+.tagline {
+  text-align:center;
+  font-size:11px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:2px;
+  color:var(--g);
+  margin-bottom:28px;
+}
+h1 {
+  font-size:21px;
+  font-weight:800;
+  letter-spacing:-0.8px;
+  margin-bottom:8px;
+}
+.sub {
+  font-size:14px;
+  color:var(--g);
+  line-height:1.65;
+  margin-bottom:28px;
+}
+.field { margin-bottom:16px; }
+label { display:block; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--g); margin-bottom:6px; }
+input[type=email], input[type=text] {
+  width:100%;
+  padding:12px 14px;
+  border:1.5px solid #ddd;
+  border-radius:3px;
+  font-size:15px;
+  outline:none;
+  transition:border-color .15s;
+}
+input:focus { border-color:var(--k); }
+.otp-input {
+  letter-spacing:8px;
+  font-size:22px;
+  font-weight:700;
+  text-align:center;
+}
+.btn {
+  width:100%;
+  padding:13px;
+  background:var(--k);
+  color:#fff;
+  border:none;
+  border-radius:3px;
+  font-size:15px;
+  font-weight:700;
+  cursor:pointer;
+  transition:opacity .15s;
+}
+.btn:hover { opacity:.85; }
+.btn:disabled { opacity:.45; cursor:not-allowed; }
+.btn-ghost {
+  background:none;
+  color:var(--g);
+  border:1.5px solid #ddd;
+  margin-top:10px;
+}
+.btn-ghost:hover { border-color:var(--k); color:var(--k); opacity:1; }
+.alert {
+  padding:10px 14px;
+  border-radius:3px;
+  font-size:13px;
+  margin-bottom:16px;
+  display:none;
+}
+.alert-error   { background:#fee2e2; color:#991b1b; }
+.alert-success { background:#dcfce7; color:#166534; }
+.resend {
+  text-align:center;
+  font-size:12px;
+  color:var(--g);
+  margin-top:14px;
+}
+.resend a { color:var(--k); font-weight:700; cursor:pointer; text-decoration:underline; }
+.note {
+  text-align:center;
+  font-size:12px;
+  color:#bbb;
+  line-height:1.7;
+  margin-top:20px;
+}
+.note a { color:var(--g); text-decoration:underline; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo"><span>ala</span>idin</div>
+  <div class="tagline">Observer Access</div>
+
+  <!-- Panel 1: Email entry -->
+  <div id="panel-email">
+    <h1>Watch live strategies.</h1>
+    <p class="sub">Enter your email to get a one-time login code. No broker account needed.</p>
+    <div class="alert alert-error" id="email-error"></div>
+    <div class="field">
+      <label>Email address</label>
+      <input type="email" id="email-input" placeholder="you@example.com" autocomplete="email">
+    </div>
+    <button class="btn" id="btn-send" onclick="sendOtp()">Send login code</button>
+    <p class="note">Already have an account? <a href="/subscribe">Subscribe to copy trades →</a></p>
+  </div>
+
+  <!-- Panel 2: OTP entry -->
+  <div id="panel-otp" style="display:none">
+    <h1>Check your inbox.</h1>
+    <p class="sub" id="otp-sub">We sent a 6-digit code to <strong id="otp-email-label"></strong>.</p>
+    <div class="alert alert-error" id="otp-error"></div>
+    <div class="alert alert-success" id="otp-success"></div>
+    <div class="field">
+      <label>Login code</label>
+      <input type="text" id="otp-input" class="otp-input" placeholder="000000" maxlength="6"
+        inputmode="numeric" autocomplete="one-time-code" onkeydown="otpKeydown(event)">
+    </div>
+    <button class="btn" id="btn-verify" onclick="verifyOtp()">Verify →</button>
+    <button class="btn btn-ghost" onclick="goBack()">← Use a different email</button>
+    <div class="resend">Didn't get it? <a onclick="resend()">Resend code</a></div>
+  </div>
+</div>
+
+<script>
+const API = window.location.origin;
+let _email = '';
+
+function showError(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+function showSuccess(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+
+async function sendOtp() {
+  const emailEl = document.getElementById('email-input');
+  const email = emailEl.value.trim().toLowerCase();
+  if (!email || !/^[^@]+@[^@]+\.[^@]+$/.test(email)) {
+    showError('email-error', 'Enter a valid email address.');
+    return;
+  }
+  showError('email-error', '');
+  document.getElementById('btn-send').disabled = true;
+  document.getElementById('btn-send').textContent = 'Sending…';
+
+  try {
+    const r = await fetch(`${API}/api/observer/request-otp`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email}),
+    });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+
+    _email = email;
+    document.getElementById('otp-email-label').textContent = email;
+    document.getElementById('panel-email').style.display = 'none';
+    document.getElementById('panel-otp').style.display = 'block';
+    document.getElementById('otp-input').focus();
+
+    // Dev mode: pre-fill OTP
+    if (d.dev_otp) {
+      document.getElementById('otp-input').value = d.dev_otp;
+      showSuccess('otp-success', `Dev mode: code is ${d.dev_otp}`);
+    }
+  } catch(e) {
+    showError('email-error', e.message || 'Failed to send code. Try again.');
+  } finally {
+    document.getElementById('btn-send').disabled = false;
+    document.getElementById('btn-send').textContent = 'Send login code';
+  }
+}
+
+async function verifyOtp() {
+  const otp = document.getElementById('otp-input').value.trim();
+  if (otp.length !== 6) {
+    showError('otp-error', 'Enter the 6-digit code from your email.');
+    return;
+  }
+  showError('otp-error', '');
+  document.getElementById('btn-verify').disabled = true;
+  document.getElementById('btn-verify').textContent = 'Verifying…';
+
+  try {
+    const r = await fetch(`${API}/api/observer/verify-otp`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email: _email, otp}),
+    });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    window.location.href = '/dashboard?view=observe';
+  } catch(e) {
+    showError('otp-error', e.message || 'Invalid code. Try again.');
+    document.getElementById('btn-verify').disabled = false;
+    document.getElementById('btn-verify').textContent = 'Verify →';
+  }
+}
+
+async function resend() {
+  showError('otp-error', '');
+  showSuccess('otp-success', '');
+  document.getElementById('otp-input').value = '';
+  try {
+    const r = await fetch(`${API}/api/observer/request-otp`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email: _email}),
+    });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    showSuccess('otp-success', 'New code sent!');
+    if (d.dev_otp) {
+      document.getElementById('otp-input').value = d.dev_otp;
+      showSuccess('otp-success', `Dev mode: code is ${d.dev_otp}`);
+    }
+  } catch(e) {
+    showError('otp-error', e.message || 'Failed to resend. Try again.');
+  }
+}
+
+function goBack() {
+  document.getElementById('panel-otp').style.display = 'none';
+  document.getElementById('panel-email').style.display = 'block';
+  document.getElementById('otp-input').value = '';
+  showError('otp-error', '');
+}
+
+function otpKeydown(e) {
+  if (e.key === 'Enter') verifyOtp();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('email-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') sendOtp();
+  });
+});
+</script>
+</body>
+</html>

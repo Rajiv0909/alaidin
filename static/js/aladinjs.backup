@@ -1,0 +1,1945 @@
+
+// Enhanced ALADIN client with improved visualization
+class ALADINStreamingClient {
+    constructor() {
+        this.sessionId = null;
+        this.isProcessing = false;
+        this.eventSource = null;
+        this.currentSymbol = null;
+        this.priceChart = null;
+        this.analysisData = null;
+        this.currentWorkflowSymbol = null; 
+        this.currentTimeframe = 30; // Default to 30 days
+        
+        // Configuration
+        this.config = {
+            apiEndpoint: '/api/aladin/chat',
+            streamTimeout: 30000,
+            retryAttempts: 3,
+            retryDelay: 2000
+        };
+        
+        // Initialize when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => this.initializeApp());
+        } else {
+            this.initializeApp();
+        }
+    }
+
+    initializeApp() {
+        console.log('ai<strong>ai</strong>din Streaming Client - Initializing with enhanced visualization...');
+        
+        this.generateSessionId();
+        this.initializeUIElements();
+        this.setupEventListeners();
+        this.updateSessionInfo();
+        this.setSystemStatus('ready');
+        
+        // Add welcome message
+        this.addChatMessage("Welcome to al! Try asking me to 'analyze BPCL' or any other stock symbol.", 'assistant');
+        
+        console.log('âœ… al initialization complete');
+        console.log(`ðŸ“± Session ID: ${this.sessionId}`);
+    }
+
+    generateSessionId() {
+        const timestamp = Date.now();
+        const randomPart = Math.random().toString(36).substr(2, 8);
+        this.sessionId = `web_${timestamp}_${randomPart}`;
+    }
+
+    initializeUIElements() {
+        this.chatInput = document.getElementById('chat-input');
+        this.sendButton = document.getElementById('send-button');
+        this.chatHistory = document.getElementById('chat-history');
+        this.sessionDisplay = document.getElementById('session-id');
+        this.systemStatus = document.getElementById('system-status');
+        this.timeframeSelector = document.getElementById('timeframe-selector');
+        
+        // Initialize agent status elements
+        this.dataStatus = document.getElementById('data-status');
+        this.toolsStatus = document.getElementById('tools-status');
+        this.analysisStatus = document.getElementById('analysis-status');
+        
+        if (!this.chatInput || !this.sendButton || !this.chatHistory) {
+            console.error('âŒ Required chat elements not found');
+            this.showSystemMessage('Interface initialization failed', 'error');
+        }
+        
+        // Set initial agent status
+        this.setAgentStatus('data', 'ready');
+        this.setAgentStatus('tools', 'ready');
+        this.setAgentStatus('analysis', 'ready');
+        
+        console.log('âœ… UI elements initialized');
+    }
+
+    setupEventListeners() {
+        this.chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                this.sendMessage();
+            }
+        });
+        
+        this.sendButton.addEventListener('click', () => {
+            this.sendMessage();
+        });
+        
+        this.chatInput.addEventListener('input', () => {
+            this.chatInput.style.height = 'auto';
+            this.chatInput.style.height = Math.min(this.chatInput.scrollHeight, 120) + 'px';
+        });
+        
+        // Timeframe selector change event
+        if (this.timeframeSelector) {
+            this.timeframeSelector.addEventListener('change', (e) => {
+                this.currentTimeframe = parseInt(e.target.value);
+                if (this.currentSymbol) {
+                    this.loadAnalysisVisualization(this.currentSymbol);
+                }
+            });
+        }
+        
+        this.chatInput.focus();
+        console.log('âœ… Event listeners attached');
+    }
+
+    updateSessionInfo() {
+        if (this.sessionDisplay) {
+            this.sessionDisplay.textContent = this.sessionId.substr(-8);
+        }
+    }
+
+    setSystemStatus(status) {
+        if (!this.systemStatus) return;
+        
+        this.systemStatus.classList.remove('ready', 'processing', 'error');
+        this.systemStatus.classList.add(status);
+        
+        const statusMap = {
+
+            'ready': '●',        // Simple bullet
+            'processing': '⚡',   // Lightning symbol  
+            'error': '✖'         // Cross symbol
+        };
+        
+        this.systemStatus.textContent = statusMap[status] || '●';
+    }
+    setAgentStatus(agent, status) {
+        const agentElement = document.querySelector(`.agent-item[data-agent="${agent}"]`);
+        if (!agentElement) return;
+        
+        // Remove all status classes
+        agentElement.classList.remove('ready', 'processing', 'complete', 'error', 'idle');
+        
+        // Add the current status class
+        agentElement.classList.add(status);
+        
+        console.log(`âœ… Agent ${agent} status set to: ${status}`);
+    }
+
+    addChatMessage(content, sender = 'assistant', type = 'normal') {
+        if (!this.chatHistory) return;
+        
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `chat-message ${sender}`;
+        
+        if (type !== 'normal') {
+            messageDiv.classList.add(type);
+        }
+        
+        if (sender === 'user') {
+            messageDiv.innerHTML = `<strong>You:</strong> ${this.escapeHtml(content)}`;
+        } else if (sender === 'system') {
+            messageDiv.innerHTML = content;
+        } else {
+            messageDiv.innerHTML = this.formatAssistantMessage(content);
+        }
+        
+        const timestamp = new Date().toLocaleTimeString();
+        messageDiv.setAttribute('data-timestamp', timestamp);
+        
+        this.chatHistory.appendChild(messageDiv);
+        this.scrollToBottom();
+        
+        return messageDiv;
+    }
+
+    formatAssistantMessage(content) {
+        return `<span style="font-size: 1.25em;"><span style="font-weight: 300;">al</span><strong>ai</strong><span style="font-weight: 300;">din</span></span>: ${this.escapeHtml(content)}`;
+
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    scrollToBottom() {
+        if (this.chatHistory) {
+            this.chatHistory.scrollTop = this.chatHistory.scrollHeight;
+        }
+    }
+
+    showSystemMessage(message, type = 'system') {
+        this.addChatMessage(message, 'system', type);
+    }
+
+    // ============================================================================
+    // NEW: Single backend communication method
+    // ============================================================================
+
+    async sendToBackend(message) {
+        try {
+            const response = await fetch(this.config.apiEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'text/event-stream, application/json'  // Accept both
+                },
+                body: JSON.stringify({
+                    message: message,
+                    session_id: this.sessionId
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const contentType = response.headers.get('content-type');
+            console.log('ðŸ“„ Backend response type:', contentType);
+            
+            // âœ… BACKEND DECIDES: Check what the backend returned
+            if (contentType && contentType.includes('text/event-stream')) {
+                console.log('ðŸŒŠ Backend chose streaming - setting up event source');
+                this.setupEventSource(response);
+            } else if (contentType && contentType.includes('application/json')) {
+                console.log('ðŸ’¬ Backend chose JSON - handling regular response');
+                const data = await response.json();
+                
+                // âœ… CHECK: Does JSON response indicate workflow should start?
+                if (data.type === 'analysis' && data.workflow_initiated) {
+                    console.log('ðŸŽ¯ JSON response indicates workflow started - wait for streaming');
+                    this.showSystemMessage('Analysis workflow started...', 'info');
+                    // Don't show the response text yet - wait for workflow updates
+                } else {
+                    this.handleRegularResponse(data);
+                }
+            } else {
+                console.warn('âš ï¸ Unexpected content type:', contentType);
+                const text = await response.text();
+                this.showSystemMessage(`Unexpected response: ${text}`, 'warning');
+            }
+            
+        } catch (error) {
+            console.error('âŒ Backend communication error:', error);
+            this.showSystemMessage(`Error: ${error.message}`, 'error');
+            throw error;
+        }
+    }
+
+    async sendMessage() {
+        if (this.isProcessing || !this.chatInput) return;
+        
+        const message = this.chatInput.value.trim();
+        if (!message) return;
+        
+        console.log('ðŸš€ Sending message:', message);
+        this.addChatMessage(message, 'user');
+        
+        this.chatInput.value = '';
+        this.chatInput.style.height = 'auto';
+        this.setProcessingState(true);
+        
+        try {
+            // Use the new backend communication method
+            console.log('ðŸ“¡ Sending to backend for routing decision...');
+            await this.sendToBackend(message);
+            
+        } catch (error) {
+            console.error('âŒ Send message error:', error);
+            this.showSystemMessage(`Error: ${error.message}`, 'error');
+        } finally {
+            this.setProcessingState(false);
+        }
+    }
+
+    setProcessingState(processing) {
+        this.isProcessing = processing;
+        
+        if (this.sendButton) {
+            this.sendButton.disabled = processing;
+            this.sendButton.textContent = processing ? 'Processing...' : 'Send';
+        }
+        
+        if (this.chatInput) {
+            this.chatInput.disabled = processing;
+        }
+        
+        this.setSystemStatus(processing ? 'processing' : 'ready');
+    }
+
+
+    setupEventSource(response) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        this.processStreamChunks(reader, decoder);
+    }
+
+    async processStreamChunks(reader, decoder) {
+        let buffer = '';
+        
+        try {
+            while (true) {
+                const { value, done } = await reader.read();
+                
+                if (done) {
+                    console.log('âœ… Stream completed');
+                    break;
+                }
+                
+                buffer += decoder.decode(value, { stream: true });
+                
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+                
+                for (const line of lines) {
+                    this.processStreamLine(line);
+                }
+            }
+        } catch (error) {
+            console.error('âŒ Stream processing error:', error);
+            this.showSystemMessage(`Stream error: ${error.message}`, 'error');
+        }
+    }
+
+    processStreamLine(line) {
+        if (!line.trim()) return;
+        
+        if (line.startsWith('data: ')) {
+            const dataStr = line.substring(6).trim();
+            
+            if (dataStr === '[DONE]') {
+                console.log('âœ… Stream marked as complete');
+                return;
+            }
+            
+            try {
+                const data = JSON.parse(dataStr);
+                this.handleStreamUpdate(data);
+            } catch (error) {
+                console.warn('âš ï¸ Failed to parse stream data:', dataStr);
+            }
+        }
+    }
+
+    // PATCH 1: Enhanced handleStreamUpdate method
+    // REPLACE the existing handleStreamUpdate method with this enhanced version
+    // Updated handleStreamUpdate method to handle 'load_chart' trigger
+    // REPLACE the handleStreamUpdate method in your aladin.html file
+
+
+    
+    handleStreamUpdate(update) {
+        console.log('Stream update received:', update);
+        
+        try {
+            // Store symbol from any event that provides it
+            if (update.symbol) {
+                this.currentWorkflowSymbol = update.symbol;
+                console.log(`📍 Symbol stored: ${update.symbol}`);
+            }
+            
+            // Handle workflow completion with analysis data loading
+            if (update.type === 'workflow_complete' || 
+                update.type === 'load_chart' ||
+                (update.message && update.message.includes('✅') && 
+                update.message.includes('workflow complete'))) {
+                
+                let symbol = null;
+                
+                // Priority 1: Direct symbol field
+                if (update.symbol) {
+                    symbol = update.symbol;
+                    console.log(`🎯 Using direct symbol: ${symbol}`);
+                }
+                // Priority 2: Stored symbol from earlier events
+                else if (this.currentWorkflowSymbol) {
+                    symbol = this.currentWorkflowSymbol;
+                    console.log(`🎯 Using stored symbol: ${symbol}`);
+                }
+                // Priority 3: Extract from message (fallback)
+                else if (update.message) {
+                    symbol = this.extractSymbolFromMessage(update.message);
+                    console.log(`🎯 Extracted symbol from message: ${symbol}`);
+                }
+                
+                if (symbol) {
+                    console.log(`🎯 Analysis complete detected for ${symbol}`);
+                    // Load both chart data and analysis visualization
+                    this.loadAnalysisVisualization(symbol);
+                    this.resetAgentStatus();
+                    
+                    // Clear stored symbol after use
+                    this.currentWorkflowSymbol = null;
+                } else {
+                    console.warn('⚠️ Chart loading triggered but no symbol found');
+                    console.log('Debug - Update object:', update);
+                    this.showStatusUpdate('⚠️ Chart loading failed: No symbol provided', 'error');
+                }
+            }
+            
+            // Enhanced message handling
+            if (update.message) {
+                this.addChatMessage(update.message, 'assistant');
+            }
+            
+            // Agent status updates
+            if (update.agent_type || update.agent) {
+                const agent = update.agent_type || update.agent;
+                this.setAgentStatus(agent, update.status || 'processing');
+            }
+            
+            // Handle different update types
+            switch(update.type) {
+                case 'agent_status':
+                    this.setAgentStatus(update.agent, update.status);
+                    break;
+                case 'analysis_progress':
+                    this.showAnalysisProgress(update);
+                    break;
+                case 'data_loaded':
+                    this.handleDataLoadComplete(update);
+                    break;
+                case 'load_chart':
+                case 'workflow_complete':
+                    // Already handled above in the main trigger logic
+                    this.showStatusUpdate('📊 Loading chart visualization...', 'info');
+                    break;
+                case 'symbol_detected':
+                    // Symbol already stored above
+                    this.showStatusUpdate(`🔍 Analyzing ${update.symbol}...`, 'info');
+                    break;
+            }
+            
+        } catch (error) {
+            console.error('Error handling stream update:', error);
+            this.showStatusUpdate(`Stream error: ${error.message}`, 'error');
+        }
+    }
+
+    resetAgentStatus() {
+        ['data', 'tools', 'analysis'].forEach(agent => {
+            this.setAgentStatus(agent, 'ready');
+        });
+    }
+
+    extractSymbolFromMessage(message) {
+        if (!message) return null;
+        
+        const match = message.match(/workflow complete for ([A-Z]+)/i) || 
+                    message.match(/Analysis workflow complete for ([A-Z]+)/i);
+        return match ? match[1] : null;
+    }
+
+
+    handleRegularResponse(data) {
+        console.log('ðŸ“¬ Regular response:', data);
+        
+        if (data.error) {
+            this.showSystemMessage(data.error, 'error');
+            return;
+        }
+        
+        const responseText = this.extractResponseText(data);
+        
+        if (responseText) {
+            this.addChatMessage(responseText);
+        } else if (data.chat_response) {
+            this.addChatMessage(data.chat_response);
+        } else if (data.message) {
+            this.addChatMessage(data.message);
+        } else {
+            this.addChatMessage('Response received but no message content found.');
+        }
+        
+        if (data.session_id && data.session_id !== this.sessionId) {
+            this.sessionId = data.session_id;
+            this.updateSessionInfo();
+        }
+    }
+
+    extractResponseText(data) {
+        const responseFields = [
+            'chat_response',
+            'response',
+            'message',
+            'result',
+            'answer',
+            'content',
+            'text',
+            'output'
+        ];
+        
+        for (const field of responseFields) {
+            if (data[field] && typeof data[field] === 'string' && data[field].trim()) {
+                console.log(`âœ… Found response in field '${field}'`);
+                return data[field];
+            }
+        }
+        
+        if (data.result && typeof data.result === 'object') {
+            for (const field of responseFields) {
+                if (data.result[field] && typeof data.result[field] === 'string') {
+                    console.log(`âœ… Found response in nested field 'result.${field}'`);
+                    return data.result[field];
+                }
+            }
+        }
+        
+        console.warn('âŒ No response text found in any field');
+        return null;
+    }
+
+    // Enhanced visualization methods
+    // PATCH 2: Enhanced loadAnalysisVisualization method  
+    // REPLACE the existing loadAnalysisVisualization method with this enhanced version
+    async loadAnalysisVisualization(symbol) {
+        try {
+            this.currentSymbol = symbol;
+            console.log(`ðŸ“Š Loading enhanced visualization for ${symbol}`);
+            
+            // Show loading state
+            this.showStatusUpdate(`ðŸ“Š Loading analysis for ${symbol}`, 'info');
+            this.setSystemStatus('processing');
+            
+            // Show chart container and hide placeholder
+            const chartContainer = document.getElementById('chart-container');
+            const chartPlaceholder = document.getElementById('chart-placeholder');
+            // Add this to your loadAnalysisVisualization method after setting this.currentSymbol
+            const titleElement = document.getElementById('dynamic-chart-title');
+            if (titleElement) {
+                titleElement.textContent = `${symbol} Analysis (${this.currentTimeframe} days)`;
+            }
+            
+            if (chartContainer) chartContainer.style.display = 'block';
+            if (chartPlaceholder) chartPlaceholder.style.display = 'none';
+            
+            // Fetch latest analysis data from app2
+            console.log('ðŸ” Fetching latest analysis data...');
+            const analysisResponse = await fetch(`/api/aladin/analysis/${symbol}/latest`);
+            const analysisResult = await analysisResponse.json();
+            
+            if (analysisResult.success && analysisResult.data) {
+                this.analysisData = analysisResult.data;
+                this.alignChartTimeframe();
+
+                console.log('ðŸ“‹ Analysis data loaded:', this.analysisData);
+                
+                // Extract chart visualization data if available
+                if (this.analysisData.chart_visualization_data) {
+                    this.chartVisualizationData = this.analysisData.chart_visualization_data;
+                    console.log('ðŸ“Š Chart visualization data found:', this.chartVisualizationData);
+                }
+            } else {
+                console.warn('âš ï¸ No analysis data found, will show basic chart');
+            }
+            
+            // Fetch OHLCV data for chart
+            console.log('ðŸ“ˆ Fetching OHLCV data...');
+            const ohlcvResponse = await fetch(`/api/aladin/chart/${symbol}/ohlcv?days=${this.currentTimeframe}`);
+            const ohlcvResult = await ohlcvResponse.json();
+            
+            if (ohlcvResult.success && ohlcvResult.data && ohlcvResult.data.length > 0) {
+                console.log(`ðŸ“ˆ OHLCV data loaded: ${ohlcvResult.data.length} points`);
+                
+                // Create enhanced price chart with analysis annotations
+                this.createEnhancedPriceChart(ohlcvResult.data, symbol);
+                
+                // Display comprehensive analysis summary
+                this.displayEnhancedAnalysisSummary();
+                
+                this.showStatusUpdate(`âœ… Enhanced chart loaded for ${symbol}`, 'success');
+                this.setSystemStatus('ready');
+                
+            } else {
+                console.error('âŒ No OHLCV data available:', ohlcvResult.error);
+                this.showStatusUpdate(`âŒ No price data for ${symbol}`, 'error');
+                this.setSystemStatus('error');
+            }
+            
+        } catch (error) {
+            console.error('âŒ Error loading enhanced visualization:', error);
+            this.showStatusUpdate(`âŒ Visualization failed: ${error.message}`, 'error');
+            this.setSystemStatus('error');
+        }
+    }
+
+    //
+    
+    // REPLACE with this simple redirect method:
+    createPriceChart(ohlcvData, symbol) {
+        // Redirect to enhanced version
+        return this.createEnhancedPriceChart(ohlcvData, symbol);
+    }
+    // PATCH 3: Enhanced createPriceChart method (renamed to createEnhancedPriceChart)
+    // ADD this new method alongside your existing createPriceChart
+    // REPLACEMENT 2: Enhanced createEnhancedPriceChart() method
+    // Replace your existing createEnhancedPriceChart() method with this version
+    createEnhancedPriceChart(ohlcvData) {
+        if (!ohlcvData || ohlcvData.length === 0) {
+            console.error('❌ No OHLCV data provided');
+            return;
+        }
+        
+        console.log('📈 Creating enhanced price chart with X-axis alignment...');
+        
+        // Ensure timeframe alignment is applied first
+        this.alignChartTimeframe();
+        
+        // Sort and prepare data
+        const sortedData = ohlcvData.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+        const firstDataPoint = sortedData[0];
+        const lastDataPoint = sortedData[sortedData.length - 1];
+        
+        // Calculate X-axis boundaries
+        const startDate = new Date(firstDataPoint.timestamp);
+        const lastDataDate = new Date(lastDataPoint.timestamp);
+        
+        // Extend X-axis to include projection period
+        const projectionDays = this.projectionDays || 30;
+        const msPerDay = 24 * 60 * 60 * 1000;
+        const endDate = new Date(lastDataDate.getTime() + (projectionDays * msPerDay));
+        
+        console.log(`📅 X-axis range: ${startDate.toDateString()} to ${endDate.toDateString()}`);
+        console.log(`📊 Total span: ${this.analysisDays || 90}d analysis + ${projectionDays}d projection`);
+        
+        // Prepare datasets
+        const priceData = sortedData.map(item => ({
+            x: new Date(item.timestamp).getTime(),
+            y: parseFloat(item.close)
+        }));
+        
+        const volumeData = sortedData.map(item => ({
+            x: new Date(item.timestamp).getTime(),
+            y: parseInt(item.volume || 0)
+        }));
+        
+        // Chart configuration with extended X-axis
+        const config = {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: 'Price (₹)',
+                    data: priceData,
+                    borderColor: '#2196F3',
+                    backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                    borderWidth: 2,
+                    fill: false,
+                    yAxisID: 'price-axis',
+                    pointRadius: 0,
+                    pointHoverRadius: 5,
+                    order: 1
+                }, {
+                    label: 'Volume',
+                    data: volumeData,
+                    type: 'bar',
+                    backgroundColor: 'rgba(156, 204, 101, 0.4)',
+                    borderColor: 'rgba(156, 204, 101, 0.8)',
+                    borderWidth: 1,
+                    yAxisID: 'volume-axis',
+                    order: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: 'day',
+                            displayFormats: {
+                                day: 'MMM dd'
+                            }
+                        },
+                        min: startDate.getTime(),
+                        max: endDate.getTime(),
+                        title: {
+                            display: true,
+                            text: `Analysis: ${this.analysisDays || 90}d + Projection: ${projectionDays}d`
+                        }
+                    },
+                    'price-axis': {
+                        type: 'linear',
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Price (₹)'
+                        },
+                        grid: {
+                            drawOnChartArea: true
+                        },
+                        ticks: {
+                            callback: (value) => {
+                                // ADD SAFETY CHECK for analysisData
+                                if (this.analysisData && this.analysisData.chart_visualization_data) {
+                                    const vizData = this.analysisData.chart_visualization_data;
+                                    
+                                    // SAFE array creation with fallbacks
+                                    const supportLevels = Array.isArray(vizData.support_levels) ? vizData.support_levels : [];
+                                    const resistanceLevels = Array.isArray(vizData.resistance_levels) ? vizData.resistance_levels : [];
+                                    const floorCeilingLevels = Array.isArray(vizData.floor_ceiling_levels) ? vizData.floor_ceiling_levels : [];
+                                    
+                                    const allLevels = [
+                                        ...supportLevels,
+                                        ...resistanceLevels,
+                                        ...floorCeilingLevels
+                                    ].map(level => {
+                                        const price = parseFloat(level.price || level);
+                                        return isNaN(price) ? null : price;
+                                    }).filter(price => price !== null);
+                                    
+                                    const isSignificantLevel = allLevels.some(level => 
+                                        Math.abs(level - value) < (level * 0.01)
+                                    );
+                                    
+                                    if (isSignificantLevel) {
+                                        return `₹${value.toFixed(2)}`;
+                                    }
+                                }
+                                return value.toFixed(2);
+                            }
+                        }
+                    },
+                    'volume-axis': {
+                        type: 'linear',
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Volume'
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        },
+                        display: true,
+                        // SAFEST: Manual max calculation without spread syntax
+                        max: (() => {
+                            if (!volumeData || volumeData.length === 0) return 1000;
+                            
+                            let maxVolume = 0;
+                            for (const item of volumeData) {
+                                const volume = item.y || 0;
+                                if (volume > maxVolume) maxVolume = volume;
+                            }
+                            return maxVolume * 3;
+                        })(),
+                        ticks: {
+                            callback: (value) => {
+                                if (value >= 1000000) {
+                                    return (value / 1000000).toFixed(1) + 'M';
+                                } else if (value >= 1000) {
+                                    return (value / 1000).toFixed(1) + 'K';
+                                }
+                                return value;
+                            }
+                        }
+                    }                   // ✅ CORRECT: Properly closed volume-axis
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false
+                    }
+                }
+            }
+        };
+        
+        // Create chart
+        const canvas = document.getElementById('price-chart');
+        if (!canvas) {
+            console.error('❌ Chart canvas not found');
+            return;
+        }
+        
+        const ctx = canvas.getContext('2d');
+        
+        // Destroy existing chart
+        if (this.priceChart) {
+            this.priceChart.destroy();
+        }
+        
+        // Create new chart with extended X-axis
+        this.priceChart = new Chart(ctx, config);
+        
+        console.log('✅ Enhanced chart created with proper X-axis coverage');
+        
+        // Add projection line
+        this.addFutureProjection();
+        
+        // Add annotations if available
+        if (this.chartVisualizationData || this.analysisData.chart_visualization_data) {
+            this.addAnalysisAnnotations();
+        }
+    }
+
+
+
+    // Helper to skip gaps in trading data (weekends, holidays)
+    skipMissingData(ctx, defaultValue) {
+        if (!ctx.p0 || !ctx.p1) return defaultValue;
+        
+        const prevPoint = ctx.p0.parsed;
+        const currentPoint = ctx.p1.parsed;
+        
+        if (!prevPoint || !currentPoint) return defaultValue;
+        
+        // If gap between points is more than 1.5 days, it's likely a market closure
+        const gap = currentPoint.x - prevPoint.x;
+        const dayInMs = 24 * 60 * 60 * 1000;
+        
+        if (gap > 1.5 * dayInMs) {
+            return 'transparent';
+        }
+        return defaultValue;
+    }
+  
+    // PATCH 5: Enhanced analysis annotations method
+    // REPLACE the existing addAnalysisAnnotations method with this version
+    addAnalysisAnnotations() {
+        if (!this.priceChart) {
+            console.log('📊 No chart available for annotations');
+            return;
+        }
+
+        // Get chart visualization data from correct source
+        const chartVizData = this.analysisData?.chart_visualization_data || this.chartVisualizationData;
+        
+        if (!chartVizData) {
+            console.log('📊 No visualization data for annotations');
+            return;
+        }
+
+        console.log('📍 Adding analysis annotations with probability-based styling...');
+        
+        const annotations = {};
+        let annotationCounter = 0;
+
+        // Add support levels with probability-based styling
+        if (chartVizData.support_levels && Array.isArray(chartVizData.support_levels)) {
+            chartVizData.support_levels.forEach((level, index) => {
+                const price = parseFloat(level.price || level);
+                if (isNaN(price)) return;
+                
+                // Get probability
+                const probability = level.probability || level.strength || 0.7;
+                const probabilityValue = this.parseProbability(probability);
+                const probabilityPercent = Math.round(probabilityValue * 100);
+                
+                // Calculate styling based on probability
+                const { borderWidth, borderColor, borderDash } = this.getSupportResistanceStyle(probabilityValue, 'support');
+                
+                annotations[`support_${annotationCounter++}`] = {
+                    type: 'line',
+                    mode: 'horizontal',
+                    scaleID: 'price-axis', // Use price axis (secondary Y-axis)
+                    value: price,
+                    borderColor: borderColor,
+                    borderWidth: borderWidth,
+                    borderDash: borderDash,
+                    label: {
+                        enabled: true,
+                        content: `Support: ₹${price} (${probabilityPercent}%)`,
+                        position: 'left',
+                        backgroundColor: borderColor,
+                        color: 'white',
+                        font: { size: 10 }
+                    }
+                };
+                
+                console.log(`📍 Support: ₹${price} (${probabilityPercent}%) - width:${borderWidth}`);
+            });
+        }
+
+        // Add resistance levels with probability-based styling
+        if (chartVizData.resistance_levels && Array.isArray(chartVizData.resistance_levels)) {
+            chartVizData.resistance_levels.forEach((level, index) => {
+                const price = parseFloat(level.price || level);
+                if (isNaN(price)) return;
+                
+                // Get probability
+                const probability = level.probability || level.strength || 0.7;
+                const probabilityValue = this.parseProbability(probability);
+                const probabilityPercent = Math.round(probabilityValue * 100);
+                
+                // Calculate styling based on probability
+                const { borderWidth, borderColor, borderDash } = this.getSupportResistanceStyle(probabilityValue, 'resistance');
+                
+                annotations[`resistance_${annotationCounter++}`] = {
+                    type: 'line',
+                    mode: 'horizontal',
+                    scaleID: 'price-axis', // Use price axis (secondary Y-axis)
+                    value: price,
+                    borderColor: borderColor,
+                    borderWidth: borderWidth,
+                    borderDash: borderDash,
+                    label: {
+                        enabled: true,
+                        content: `Resistance: ₹${price} (${probabilityPercent}%)`,
+                        position: 'right',
+                        backgroundColor: borderColor,
+                        color: 'white',
+                        font: { size: 10 }
+                    }
+                };
+                
+                console.log(`📍 Resistance: ₹${price} (${probabilityPercent}%) - width:${borderWidth}`);
+            });
+        }
+
+        // Add floor/ceiling levels (keep original styling)
+        if (chartVizData.floor_ceiling_levels && Array.isArray(chartVizData.floor_ceiling_levels)) {
+            chartVizData.floor_ceiling_levels.forEach((level, index) => {
+                const price = parseFloat(level.price || level);
+                if (isNaN(price)) return;
+                
+                const type = level.type || 'key';
+                const color = type === 'floor' ? '#e74c3c' : type === 'ceiling' ? '#f39c12' : '#9b59b6';
+                
+                annotations[`floor_ceiling_${annotationCounter++}`] = {
+                    type: 'line',
+                    mode: 'horizontal',
+                    scaleID: 'price-axis', // Use price axis (secondary Y-axis)
+                    value: price,
+                    borderColor: color,
+                    borderWidth: 3,
+                    label: {
+                        enabled: true,
+                        content: `${type.toUpperCase()}: ₹${price}`,
+                        position: index % 2 === 0 ? 'left' : 'right',
+                        backgroundColor: color,
+                        color: 'white',
+                        font: { size: 10, weight: 'bold' }
+                    }
+                };
+            });
+        }
+
+        // CRITICAL: Ensure chart has annotation plugin configured
+        if (!this.priceChart.options.plugins) {
+            this.priceChart.options.plugins = {};
+        }
+        
+        this.priceChart.options.plugins.annotation = {
+            annotations: annotations,
+            clip: false,
+            interaction: {
+                intersect: true
+            }
+        };
+
+        // Update chart with corrected annotations
+        this.priceChart.update('none');
+        
+        console.log(`✅ Added ${Object.keys(annotations).length} annotations using price-axis`);
+        console.log(`📊 Support levels: ${chartVizData.support_levels?.length || 0}, Resistance levels: ${chartVizData.resistance_levels?.length || 0}`);
+        
+        // Debug axis configuration
+        this.debugAxisConfiguration();
+    }
+
+    // ADD this helper method to format price labels
+    formatPriceLabel(price) {
+        return `₹${price.toFixed(2)}`;
+    }
+    // ADD these helper methods for probability-based styling
+    parseProbability(probability) {
+        // Handle different probability formats
+        if (typeof probability === 'number') {
+            return Math.min(1, Math.max(0, probability));
+        }
+        
+        if (typeof probability === 'string') {
+            // Handle percentage strings like "85%"
+            if (probability.includes('%')) {
+                return parseFloat(probability) / 100;
+            }
+            
+            // Handle textual probabilities
+            const probMap = {
+                'high': 0.85, 'strong': 0.85, 'very high': 0.9, 'very strong': 0.9,
+                'medium': 0.7, 'moderate': 0.7, 'medium-high': 0.75,
+                'low': 0.5, 'weak': 0.5, 'very low': 0.3, 'very weak': 0.3
+            };
+            
+            return probMap[probability.toLowerCase()] || 0.7;
+        }
+        
+        return 0.7; // Default medium probability
+    }
+
+    getSupportResistanceStyle(probability, type) {
+        // Base colors for support and resistance
+        const baseColors = {
+            'support': 'rgba(46, 204, 113, {alpha})', // Green for support
+            'resistance': 'rgba(231, 76, 60, {alpha})' // Red for resistance
+        };
+        
+        // Calculate transparency based on probability (higher probability = less transparency)
+        const alpha = 1 - probability; // 85% probability = 15% transparency
+        
+        // Calculate line width based on probability (higher probability = thicker line)
+        const borderWidth = Math.max(1, Math.min(4, Math.round(probability * 4)));
+        
+        // Always use dashed lines for support/resistance
+        const borderDash = [5, 5];
+        
+        // Get the appropriate base color
+        const baseColor = baseColors[type] || baseColors.support;
+        const borderColor = baseColor.replace('{alpha}', alpha.toFixed(2));
+        
+        return {
+            borderWidth: borderWidth,
+            borderColor: borderColor,
+            borderDash: borderDash
+        };
+        
+        // Get chart visualization data from correct source
+        const chartVizData = this.analysisData?.chart_visualization_data || this.chartVisualizationData;
+        
+        if (!chartVizData) {
+            console.log('📊 No visualization data for annotations');
+            return;
+        }
+
+        console.log('📍 Adding analysis annotations with corrected scaling...');
+        
+        const annotations = {};
+        let annotationCounter = 0;
+
+        // CRITICAL FIX: All price annotations must use 'price-axis' scaleID
+        
+        // Add support levels with correct axis reference
+        if (chartVizData.support_levels && Array.isArray(chartVizData.support_levels)) {
+            chartVizData.support_levels.forEach((level, index) => {
+                const price = parseFloat(level.price || level);
+                if (isNaN(price)) return; // Skip invalid prices
+                
+                const strength = level.strength || 'medium';
+                const color = this.getSupportResistanceColor(strength);
+                
+                annotations[`support_${annotationCounter++}`] = {
+                    type: 'line',
+                    mode: 'horizontal',
+                    scaleID: 'price-axis', // CRITICAL: Use price axis, not volume axis
+                    value: price,
+                    borderColor: color,
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    label: {
+                        enabled: true,
+                        content: `Support: ₹${price}`,
+                        position: 'left',
+                        backgroundColor: color,
+                        color: 'white',
+                        font: { size: 10 }
+                    }
+                };
+                
+                console.log(`📍 Support: ₹${price} (${strength}) - price-axis`);
+            });
+        }
+
+        // Add resistance levels with correct axis reference
+        if (chartVizData.resistance_levels && Array.isArray(chartVizData.resistance_levels)) {
+            chartVizData.resistance_levels.forEach((level, index) => {
+                const price = parseFloat(level.price || level);
+                if (isNaN(price)) return; // Skip invalid prices
+                
+                const strength = level.strength || 'medium';
+                const color = this.getSupportResistanceColor(strength);
+                
+                annotations[`resistance_${annotationCounter++}`] = {
+                    type: 'line',
+                    mode: 'horizontal',
+                    scaleID: 'price-axis', // CRITICAL: Use price axis, not volume axis
+                    value: price,
+                    borderColor: color,
+                    borderWidth: 2,
+                    borderDash: [3, 3],
+                    label: {
+                        enabled: true,
+                        content: `Resistance: ₹${price}`,
+                        position: 'right',
+                        backgroundColor: color,
+                        color: 'white',
+                        font: { size: 10 }
+                    }
+                };
+                
+                console.log(`📍 Resistance: ₹${price} (${strength}) - price-axis`);
+            });
+        }
+
+        // Add floor/ceiling levels from floor_ceiling_levels field
+        if (chartVizData.floor_ceiling_levels && Array.isArray(chartVizData.floor_ceiling_levels)) {
+            chartVizData.floor_ceiling_levels.forEach((level, index) => {
+                const price = parseFloat(level.price || level);
+                if (isNaN(price)) return;
+                
+                const type = level.type || 'key';
+                const color = type === 'floor' ? '#e74c3c' : type === 'ceiling' ? '#f39c12' : '#9b59b6';
+                
+                annotations[`floor_ceiling_${annotationCounter++}`] = {
+                    type: 'line',
+                    mode: 'horizontal',
+                    scaleID: 'price-axis', // CRITICAL: Use price axis
+                    value: price,
+                    borderColor: color,
+                    borderWidth: 3,
+                    label: {
+                        enabled: true,
+                        content: `${type.toUpperCase()}: ₹${price}`,
+                        position: index % 2 === 0 ? 'left' : 'right',
+                        backgroundColor: color,
+                        color: 'white',
+                        font: { size: 10, weight: 'bold' }
+                    }
+                };
+                
+                console.log(`📍 Floor/Ceiling: ₹${price} (${type}) - price-axis`);
+            });
+        }
+
+        // CRITICAL: Ensure chart has annotation plugin configured
+        if (!this.priceChart.options.plugins) {
+            this.priceChart.options.plugins = {};
+        }
+        
+        this.priceChart.options.plugins.annotation = {
+            annotations: annotations,
+            clip: false,
+            interaction: {
+                intersect: true
+            }
+        };
+
+        // Update chart with corrected annotations
+        this.priceChart.update('none');
+        
+        console.log(`✅ Added ${Object.keys(annotations).length} annotations with correct price-axis scaling`);
+        
+        // Debug: Verify axis configuration
+        this.debugAxisConfiguration();
+    }
+
+    // HELPER: Color mapping for support/resistance strength
+    getSupportResistanceColor(strength) {
+        const strengthLower = (strength || 'medium').toLowerCase();
+        
+        const colorMap = {
+            'strong': '#e74c3c',    // Red
+            'medium': '#f39c12',    // Orange  
+            'weak': '#f1c40f',      // Yellow
+            'high': '#e74c3c',      // Alternative: strong
+            'low': '#f1c40f',       // Alternative: weak
+            'critical': '#8e44ad'   // Purple
+        };
+        
+        return colorMap[strengthLower] || '#3498db'; // Default blue
+    }
+
+    // DEBUGGING: Verify chart axis configuration
+    debugAxisConfiguration() {
+        if (!this.priceChart) return;
+        
+        console.log('🔍 CHART AXIS DEBUG:');
+        console.log('📊 Available scales:', Object.keys(this.priceChart.scales));
+        
+        // Check price axis
+        const priceAxis = this.priceChart.scales['price-axis'];
+        if (priceAxis) {
+            console.log('📈 Price axis found:', {
+                id: priceAxis.id,
+                min: priceAxis.min,
+                max: priceAxis.max,
+                position: priceAxis.options.position
+            });
+        } else {
+            console.error('❌ Price axis not found! Annotations will fail.');
+        }
+        
+        // Check volume axis
+        const volumeAxis = this.priceChart.scales['volume-axis'];
+        if (volumeAxis) {
+            console.log('📊 Volume axis found:', {
+                id: volumeAxis.id,
+                min: volumeAxis.min,
+                max: volumeAxis.max,
+                position: volumeAxis.options.position
+            });
+        }
+        
+        // Check annotation configuration
+        const annotations = this.priceChart.options.plugins?.annotation?.annotations;
+        if (annotations) {
+            console.log('📍 Configured annotations:', Object.keys(annotations).length);
+            Object.entries(annotations).forEach(([key, annotation]) => {
+                console.log(`   ${key}: scaleID=${annotation.scaleID}, value=${annotation.value}`);
+            });
+        } else {
+            console.log('❌ No annotations configured');
+        }
+    }        
+
+
+
+    // FIX 3: Corrected projection line connection from last close price
+    addFutureProjection() {
+        if (!this.priceChart) {
+            console.log('📊 No chart available for projection');
+            return;
+        }
+        
+        // ================================================================
+        // GET TARGET INFORMATION
+        // ================================================================
+        const chartVizData = this.analysisData?.chart_visualization_data || this.chartVisualizationData;
+        const timeframeOutlook = chartVizData?.timeframe_outlook;
+        const targetTimeframe = this.analysisData?.target_timeframe || (timeframeOutlook ? Object.keys(timeframeOutlook)[0] : null);
+        
+        let targetPrice = null;
+        let probability = 'N/A';
+        let projectionDays = 0;
+        
+        // 1. Try timeframe_outlook first
+        if (timeframeOutlook && targetTimeframe && timeframeOutlook[targetTimeframe]?.target) {
+            const outlookEntry = timeframeOutlook[targetTimeframe];
+            targetPrice = parseFloat(outlookEntry.target);
+            probability = outlookEntry.probability || 'N/A';
+            projectionDays = this.parseTimeframeToDays(targetTimeframe);
+            console.log(`🎯 Timeframe outlook target: ₹${targetPrice} (${probability}%) over ${projectionDays} days`);
+        }
+        // 2. Fallback to targets array
+        else if (this.analysisData?.targets && Array.isArray(this.analysisData.targets)) {
+            const targetEntry = this.analysisData.targets.find(t => 
+                t.timeframe === targetTimeframe || 
+                this.parseTimeframeToDays(t.timeframe) === this.parseTimeframeToDays(targetTimeframe)
+            );
+            if (targetEntry) {
+                targetPrice = parseFloat(targetEntry.price);
+                probability = targetEntry.probability || 'N/A';
+                projectionDays = this.parseTimeframeToDays(targetEntry.timeframe || targetTimeframe);
+                console.log(`🎯 Targets array target: ₹${targetPrice} (${probability}%) over ${projectionDays} days`);
+            }
+        }
+        
+        if (!targetPrice) {
+            console.log('📊 No target price found for projection');
+            return;
+        }
+        
+        // ================================================================
+        // SIMPLE APPROACH: USE LAST AVAILABLE CLOSE PRICE
+        // ================================================================
+        const priceDataset = this.priceChart.data.datasets.find(d => d.label.includes('Price'));
+        if (!priceDataset?.data?.length) {
+            console.log('📊 No price data for projection');
+            return;
+        }
+        
+        const lastPoint = priceDataset.data[priceDataset.data.length - 1];
+        
+        // Get the close price - handle different data formats
+        let currentPrice, currentTime;
+        
+        if (lastPoint && typeof lastPoint.y !== 'undefined') {
+            // Standard {x, y} format
+            currentPrice = lastPoint.y;
+            currentTime = lastPoint.x;
+        } else if (lastPoint && typeof lastPoint.close !== 'undefined') {
+            // OHLC {x, open, high, low, close} format
+            currentPrice = lastPoint.close;
+            currentTime = lastPoint.x;
+        } else {
+            console.log('❌ Cannot determine current price from chart data');
+            return;
+        }
+        
+        console.log(`✅ Using last available close: ₹${currentPrice} at ${new Date(currentTime).toLocaleDateString()}`);
+        
+        // ================================================================
+        // CALCULATE PROJECTION TIMELINE
+        // ================================================================
+        const msPerDay = 24 * 60 * 60 * 1000;
+        const futureTime = currentTime + (projectionDays * msPerDay);
+        
+        console.log(`🎯 Projection: ₹${currentPrice} → ₹${targetPrice} over ${projectionDays} days`);
+        
+        // ================================================================
+        // CREATE PROJECTION LINE
+        // ================================================================
+        this.priceChart.options.scales.x.max = futureTime;
+        
+        const projectionData = [
+            { x: currentTime, y: currentPrice },    // Start from last available close
+            { x: futureTime, y: targetPrice }       // End at target price
+        ];
+        
+        // Remove existing projections
+        this.priceChart.data.datasets = this.priceChart.data.datasets.filter(d => 
+            !d.label.includes('Target') && !d.label.includes('Projection')
+        );
+        
+        // Add new projection
+        this.priceChart.data.datasets.push({
+            label: `Target: ₹${targetPrice} (${projectionDays}d, ${probability}%)`,
+            data: projectionData,
+            borderColor: '#ff9500',
+            backgroundColor: 'rgba(255, 149, 0, 0.1)',
+            borderWidth: 3,
+            borderDash: [10, 5],
+            pointRadius: [0, 8],
+            pointBackgroundColor: ['transparent', '#ff9500'],
+            pointBorderColor: ['transparent', '#ffffff'],
+            pointBorderWidth: 3,
+            fill: false,
+            spanGaps: true,
+            tension: 0,
+            yAxisID: 'price-axis'
+        });
+        
+        this.priceChart.update('none');
+        console.log('✅ Projection line added successfully');
+        console.log('📍 From:', { date: new Date(currentTime).toLocaleDateString(), price: currentPrice });
+        console.log('📍 To:', { date: new Date(futureTime).toLocaleDateString(), price: targetPrice });
+    }
+
+    // PATCH 4: New method for processing OHLCV data
+    // ADD this new method
+    // Replace existing processOHLCVData with:
+    processOHLCVData(ohlcvData) {
+        // Apply gap removal first
+        const cleanedData = this.processOHLCVWithGapRemoval(ohlcvData);
+        
+        let processedData = [];
+        if (cleanedData.length > 0 && typeof cleanedData[0] === 'object') {
+            processedData = cleanedData.map(item => ({
+                x: new Date(item.timestamp),
+                o: parseFloat(item.open) || null,
+                h: parseFloat(item.high) || null,
+                l: parseFloat(item.low) || null,
+                c: parseFloat(item.close) || null,
+                v: parseFloat(item.volume) || null
+            })).filter(item => item.c !== null);
+        }
+        return processedData;
+    }
+
+    // PATCH 6: Enhanced analysis summary display
+    // REPLACE the existing displayAnalysisSummary method with this enhanced version
+    // REPLACE displayEnhancedAnalysisSummary with this streamlined version
+    // FIX 4: Analysis summary display (preserve original formatting)
+    displayEnhancedAnalysisSummary() {
+        const container = document.getElementById('insights-container');
+        if (!container || !this.analysisData) {
+            console.log('📋 No container or analysis data for summary');
+            return;
+        }
+        
+        console.log('📋 Displaying enhanced analysis summary...');
+        console.log('📋 Analysis data available:', !!this.analysisData);
+        
+        let html = '';
+        
+        // Executive Summary - preserve original formatting
+        if (this.analysisData.executive_summary) {
+            html += `<div class="analysis-content">${this.analysisData.executive_summary}</div>`;
+            console.log('📝 Added executive summary');
+        }
+        
+        // Detailed Analysis - preserve markdown formatting
+        if (this.analysisData.detailed_analysis) {
+            const formattedAnalysis = this.analysisData.detailed_analysis
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>');
+            html += `<div class="analysis-content">${formattedAnalysis}</div>`;
+            console.log('📝 Added detailed analysis');
+        }
+        
+        // Trading Recommendations - preserve markdown formatting
+        if (this.analysisData.trading_recommendations) {
+            const formattedRecs = this.analysisData.trading_recommendations
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>');
+            html += `<div class="analysis-content">${formattedRecs}</div>`;
+            console.log('📝 Added trading recommendations');
+        }
+        
+        // Timeframe Predictions - preserve markdown formatting
+        if (this.analysisData.timeframe_predictions) {
+            const formattedPredictions = this.analysisData.timeframe_predictions
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>');
+            html += `<div class="analysis-content">${formattedPredictions}</div>`;
+            console.log('📝 Added timeframe predictions');
+        }
+        
+        // Set content
+        container.innerHTML = html || '<div class="analysis-content">No analysis summary available</div>';
+        
+        console.log('✅ Analysis summary displayed');
+        console.log(`📋 Summary sections: ${html ? 'populated' : 'empty'}`);
+    }
+
+
+    showStatusUpdate(message, type = 'info') {
+        // Create or update status message
+        let statusDiv = document.getElementById('chart-status');
+        if (!statusDiv) {
+            statusDiv = document.createElement('div');
+            statusDiv.id = 'chart-status';
+            statusDiv.className = `status-update status-${type}`;
+            document.body.appendChild(statusDiv);
+        } else {
+            statusDiv.className = `status-update status-${type}`;
+        }
+        
+        statusDiv.textContent = message;
+        statusDiv.style.opacity = '1';
+        
+        if (type !== 'error') {
+            setTimeout(() => {
+                if (statusDiv) statusDiv.style.opacity = '0';
+            }, 3000);
+        }
+        
+        // Also add to debug panel
+        this.addDebugMessage(`${type.toUpperCase()}: ${message}`);
+    }
+
+    addDebugMessage(message) {
+        const debugPanel = document.getElementById('debug-content');
+        if (debugPanel) {
+            const messageDiv = document.createElement('div');
+            messageDiv.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            debugPanel.appendChild(messageDiv);
+            debugPanel.scrollTop = debugPanel.scrollHeight;
+        }
+    }
+
+    // Test method to verify chart functionality
+    testChartFunctionality() {
+        console.log('Testing chart functionality...');
+        
+        // Test with mock data that simulates market hours (9:15 AM to 3:30 PM)
+        const mockData = [];
+        const now = new Date();
+        
+        for (let i = 0; i < 20; i++) {
+            const date = new Date(now);
+            date.setDate(now.getDate() - (19 - i));
+            
+            // Only add data for weekdays (Mon-Fri)
+            if (date.getDay() >= 1 && date.getDay() <= 5) {
+                // Set time to market open
+                date.setHours(9, 15, 0, 0);
+                
+                mockData.push({
+                    timestamp: date.toISOString(),
+                    open: 320 + Math.random() * 20,
+                    high: 325 + Math.random() * 10,
+                    low: 315 + Math.random() * 10,
+                    close: 322 + Math.random() * 15,
+                    volume: 10000 + Math.floor(Math.random() * 5000)
+                });
+            }
+        }
+        
+        this.createPriceChart(mockData, 'TEST');
+        this.addDebugMessage('Test chart created with mock market data');
+        
+        // Test with mock analysis data
+        this.analysisData = {
+            current_price: 333.65,
+            support_levels: [325, 320, 315],
+            resistance_levels: [340, 345, 350],
+            trend_direction: 'Bullish',
+            action: 'BUY',
+            conviction: 'High',
+            target_price: 350,
+            stop_loss: 320
+        };
+        
+        this.addChartAnnotations();
+        this.displayAnalysisSummary();
+        this.addDebugMessage('Test analysis annotations added');
+    }
+
+    // FIND and REPLACE the basic addChartAnnotations method with:
+    addChartAnnotations() {
+        // Redirect to enhanced version
+        return this.addAnalysisAnnotations();
+    }
+    // FIND the basic displayAnalysisSummary method and REPLACE with:
+    displayAnalysisSummary() {
+        // Redirect to enhanced version
+        return this.displayEnhancedAnalysisSummary();
+    }
+
+    // PATCH 7: New API endpoint handler methods
+    // ADD these new methods to handle app2 integration
+
+    async fetchLatestAnalysis(symbol) {
+        try {
+            const response = await fetch(`/api/aladin/analysis/${symbol}/latest`);
+            const result = await response.json();
+            
+            if (result.success && result.data) {
+                console.log(`Analysis data fetched for ${symbol}:`, result.data);
+                return result.data;
+            } else {
+                console.warn(`No analysis data found for ${symbol}:`, result.error);
+                return null;
+            }
+        } catch (error) {
+            console.error(`Error fetching analysis for ${symbol}:`, error);
+            return null;
+        }
+    }
+
+    async fetchOHLCVData(symbol, days = null) {
+        try {
+            const timeframe = days || this.currentTimeframe;
+            const response = await fetch(`/api/aladin/chart/${symbol}/ohlcv?days=${timeframe}`);
+            const result = await response.json();
+            
+            if (result.success && result.data && result.data.length > 0) {
+                console.log(`OHLCV data fetched for ${symbol}: ${result.data.length} points`);
+                return result.data;
+            } else {
+                console.warn(`No OHLCV data found for ${symbol}:`, result.error);
+                return [];
+            }
+        } catch (error) {
+            console.error(`Error fetching OHLCV data for ${symbol}:`, error);
+            return [];
+        }
+    }
+
+    // Gap Removal Patch - Add this method to ALADINStreamingClient class
+    // FIX 2: Market-aware OHLCV processing (5-day week, not 7-day)
+    processOHLCVWithGapRemoval(ohlcvData, gapThresholdDays = 3) {
+        if (!ohlcvData || ohlcvData.length < 2) return ohlcvData;
+        
+        const result = [];
+        const msPerDay = 24 * 60 * 60 * 1000;
+        const gapThreshold = gapThresholdDays * msPerDay;
+        
+        // Sort by timestamp
+        const sorted = [...ohlcvData].sort((a, b) => 
+            new Date(a.timestamp) - new Date(b.timestamp)
+        );
+        
+        result.push(sorted[0]); // Add first point
+        
+        for (let i = 1; i < sorted.length; i++) {
+            const prevDate = new Date(sorted[i-1].timestamp);
+            const currentDate = new Date(sorted[i].timestamp);
+            const gap = currentDate.getTime() - prevDate.getTime();
+            
+            // MARKET FIX: Only add gap breaks for actual trading gaps (> 3 market days)
+            // Don't break lines for weekends (2 days) or single holidays
+            const isWeekendGap = this.isWeekendOnlyGap(prevDate, currentDate);
+            
+            if (gap > gapThreshold && !isWeekendGap) {
+                result.push({
+                    timestamp: new Date(prevDate.getTime() + msPerDay).toISOString(),
+                    open: null, high: null, low: null, close: null, volume: null
+                });
+            }
+            
+            result.push(sorted[i]);
+        }
+        
+        return result;
+    }
+
+    // FIX 2 Helper: Check if gap is only weekend
+    isWeekendOnlyGap(prevDate, currentDate) {
+        const daysBetween = (currentDate - prevDate) / (24 * 60 * 60 * 1000);
+        
+        // If gap is exactly 2-3 days and spans a weekend, it's normal
+        if (daysBetween <= 3) {
+            const prevDay = prevDate.getDay(); // 0=Sunday, 5=Friday, 6=Saturday
+            const currentDay = currentDate.getDay();
+            
+            // Friday to Monday (2-3 days) is normal weekend gap
+            if (prevDay === 5 && (currentDay === 1 || currentDay === 0)) {
+                return true;
+            }
+            // Handle holidays adjacent to weekends
+            if (daysBetween <= 3 && (prevDay === 5 || currentDay === 1)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+
+    // FIX 1: Correct alignChartTimeframe with original formatting preserved
+    // REPLACE the existing alignChartTimeframe method with this version
+    // REPLACE the existing alignChartTimeframe method with this version
+    alignChartTimeframe() {
+        if (!this.analysisData) {
+            const errorMsg = '⚠️ No analysis data available for timeframe alignment';
+            console.warn(errorMsg);
+            this.showStatusUpdate(errorMsg, 'error');
+            return false;
+        }
+        
+        console.log('🔍 DEBUG: Analysis data received:', this.analysisData);
+        
+        let analysisPeriodDays = 90; // default
+        let projectionPeriodDays = 30; // default
+        let analysisSource = 'DEFAULT';
+        let projectionSource = 'DEFAULT';
+        
+        // DEBUG: Check what timeframe fields actually contain
+        console.log('📊 timeframe field:', this.analysisData.timeframe, typeof this.analysisData.timeframe);
+        console.log('🎯 target_timeframe field:', this.analysisData.target_timeframe, typeof this.analysisData.target_timeframe);
+        console.log('📈 data_points_analyzed:', this.analysisData.data_points_analyzed, typeof this.analysisData.data_points_analyzed);
+        
+        // Step 1: Extract analysis period (historical)
+        if (this.analysisData.timeframe && !isNaN(parseInt(this.analysisData.timeframe))) {
+            analysisPeriodDays = parseInt(this.analysisData.timeframe);
+            analysisSource = 'timeframe field';
+            console.log(`📊 Using timeframe: ${this.analysisData.timeframe} → ${analysisPeriodDays} days`);
+        } 
+        else if (this.analysisData.data_points_analyzed) {
+            analysisPeriodDays = Math.ceil(this.analysisData.data_points_analyzed / 1.4);
+            analysisSource = 'data_points_analyzed';
+            console.log(`📊 Using data_points: ${this.analysisData.data_points_analyzed} → ${analysisPeriodDays} days`);
+        }
+        else {
+            const warnMsg = '⚠️ No valid timeframe data - using default 90 days';
+            console.warn(warnMsg);
+            this.showStatusUpdate(warnMsg, 'warning');
+        }
+        
+        // Step 2: Extract projection period (future)
+        if (this.analysisData.target_timeframe) {
+            projectionPeriodDays = this.parseTimeframeToDays(this.analysisData.target_timeframe);
+            projectionSource = 'target_timeframe';
+            console.log(`🎯 Using target_timeframe: "${this.analysisData.target_timeframe}" → ${projectionPeriodDays} days`);
+        } 
+        else if (this.analysisData.timeframe_outlook) {
+            // Try to get from timeframe_outlook
+            try {
+                const outlook = typeof this.analysisData.timeframe_outlook === 'string' 
+                    ? JSON.parse(this.analysisData.timeframe_outlook)
+                    : this.analysisData.timeframe_outlook;
+                
+                const firstKey = Object.keys(outlook)[0];
+                if (firstKey) {
+                    projectionPeriodDays = this.parseTimeframeToDays(firstKey);
+                    projectionSource = 'timeframe_outlook';
+                    console.log(`🎯 Using timeframe_outlook: "${firstKey}" → ${projectionPeriodDays} days`);
+                }
+            } catch (e) {
+                console.warn('❌ Failed to parse timeframe_outlook:', e);
+            }
+        }
+        else {
+            const warnMsg = '⚠️ No projection timeframe - using default 30 days';
+            console.warn(warnMsg);
+            this.showStatusUpdate(warnMsg, 'warning');
+        }
+        
+        // Step 3: Final calculation
+        const totalTimeframeDays = analysisPeriodDays + projectionPeriodDays;
+        
+        console.log('📊 FINAL TIMEFRAME CALCULATION:');
+        console.log(`   Analysis: ${analysisPeriodDays}d (from ${analysisSource})`);
+        console.log(`   Projection: ${projectionPeriodDays}d (from ${projectionSource})`);
+        console.log(`   Total: ${totalTimeframeDays}d`);
+        
+        // Show user what we found
+        const statusMsg = `Chart: ${analysisPeriodDays}d historical + ${projectionPeriodDays}d projection`;
+        this.showStatusUpdate(statusMsg, 'info');
+        
+        // Step 4: Update if needed
+        if (totalTimeframeDays !== this.currentTimeframe) {
+            const oldTimeframe = this.currentTimeframe;
+            this.currentTimeframe = totalTimeframeDays;
+            this.analysisDays = analysisPeriodDays;
+            this.projectionDays = projectionPeriodDays;
+            
+            console.log(`🔄 Updating chart timeframe: ${oldTimeframe} → ${this.currentTimeframe} days`);
+            
+            const selector = document.getElementById('timeframe-selector');
+            if (selector) {
+                selector.value = this.currentTimeframe;
+            }
+            
+            return true;
+        }
+        
+        console.log('✅ Chart timeframe already aligned');
+        return false;
+    }
+
+    // Helper method to extract projection period from text
+    extractProjectionFromText(text) {
+        if (!text) return 30; // default
+        
+        const textLower = text.toLowerCase();
+        
+        // Look for explicit timeframe mentions
+        if (textLower.includes('1 week') || textLower.includes('weekly')) return 7;
+        if (textLower.includes('2 week') || textLower.includes('biweekly')) return 14;
+        if (textLower.includes('1 month') || textLower.includes('monthly')) return 30;
+        if (textLower.includes('2 month')) return 60;
+        if (textLower.includes('3 month') || textLower.includes('quarterly')) return 90;
+        if (textLower.includes('6 month')) return 180;
+        if (textLower.includes('1 year') || textLower.includes('yearly')) return 365;
+        
+        // Look for specific day mentions
+        const dayMatch = text.match(/(\d+)\s*days?\b/i);
+        if (dayMatch) {
+            const days = parseInt(dayMatch[1]);
+            if (days > 0 && days < 1000) return days;
+        }
+        
+        return 30; // fallback
+    }
+
+    // Enhanced parseTimeframeToDays method
+    // ENHANCE this method to handle intraday and other timeframes
+    parseTimeframeToDays(timeframe) {
+        if (!timeframe) return 30;
+        
+        const timeframeStr = String(timeframe).toLowerCase().trim();
+        console.log('🔍 Parsing timeframe:', timeframeStr);
+        
+        // Handle numeric values directly
+        if (!isNaN(timeframeStr)) {
+            const days = parseInt(timeframeStr);
+            return Math.min(365, Math.max(1, days)); // Limit to reasonable range
+        }
+        
+        // Handle text timeframes - ADD INTRADAY SUPPORT
+        const mapping = {
+            // INTRADAY TIMEFRAMES - ADD THESE
+            'intraday': 1, 'intra_day': 1, 'daily': 1, '1d': 1, '1_day': 1,
+            'today': 1, 'current_day': 1, 'day': 1,
+            
+            // EXISTING MAPPINGS
+            '1_week': 7, '1week': 7, 'weekly': 7, '7days': 7, '7_days': 7,
+            '2_weeks': 14, '2weeks': 14, 'biweekly': 14, '14days': 14, '14_days': 14,
+            '1_month': 30, '1month': 30, 'monthly': 30, '30days': 30, '30_days': 30,
+            '2_months': 60, '2months': 60, '60days': 60, '60_days': 60,
+            '3_months': 90, '3months': 90, 'quarterly': 90, '90days': 90, '90_days': 90,
+            '6_months': 180, '6months': 180, 'half_year': 180, '180days': 180, '180_days': 180,
+            '1_year': 365, '1year': 365, 'yearly': 365, '365days': 365, '365_days': 365
+        };
+        
+        const result = mapping[timeframeStr] || 30;
+        console.log(`   → Parsed "${timeframeStr}" as: ${result} days`);
+        return result;
+    }
+
+    // DEBUGGING: Show the simple mapping
+    debugSimpleMapping() {
+        if (!this.analysisData) {
+            console.log('❌ No analysis data');
+            return;
+        }
+        
+        console.log('🔍 SIMPLE MAPPING DEBUG:');
+        console.log('📊 Analysis period source:');
+        console.log(`   timeframe field: ${this.analysisData.timeframe} (${typeof this.analysisData.timeframe})`);
+        console.log(`   → Analysis days: ${parseInt(this.analysisData.timeframe || 90)}`);
+        
+        console.log('📊 Projection period source:');
+        console.log(`   target_timeframe: "${this.analysisData.target_timeframe}"`);
+        console.log(`   timeframe_outlook keys: ${this.analysisData.timeframe_outlook ? Object.keys(this.analysisData.timeframe_outlook) : 'none'}`);
+        
+        if (this.analysisData.chart_visualization_data?.timeframe_outlook) {
+            console.log(`   chart_viz timeframe_outlook: ${Object.keys(this.analysisData.chart_visualization_data.timeframe_outlook)}`);
+        }
+        
+        const projectionDays = this.parseTimeframeToDays(
+            this.analysisData.target_timeframe || 
+            (this.analysisData.timeframe_outlook ? Object.keys(this.analysisData.timeframe_outlook)[0] : null)
+        );
+        console.log(`   → Projection days: ${projectionDays}`);
+        
+        console.log('📊 Final calculation:');
+        const analysisDays = parseInt(this.analysisData.timeframe || 90);
+        console.log(`   Total X-axis: ${analysisDays} + ${projectionDays} = ${analysisDays + projectionDays} days`);
+    }
+
+    // QUICK TEST: Verify the mapping works
+    testTimeframeMapping() {
+        console.log('🧪 TESTING TIMEFRAME MAPPING:');
+        
+        // Test analysis period parsing
+        const testAnalysisPeriods = [60, 90, '60', '90'];
+        testAnalysisPeriods.forEach(period => {
+            const days = parseInt(period);
+            console.log(`   timeframe ${period} → ${days} days`);
+        });
+        
+        // Test projection period parsing  
+        const testProjectionPeriods = ['1_month', '3_months', '6_months', '1_year'];
+        testProjectionPeriods.forEach(period => {
+            const days = this.parseTimeframeToDays(period);
+            console.log(`   ${period} → ${days} days`);
+        });
+    }
+
+    // Enhanced updateChartTitle method
+    updateChartTitle() {
+        if (!this.priceChart) return;
+        
+        // Build descriptive title
+        let titleText = `${this.currentSymbol} Analysis`;
+        
+        if (this.analysisDays && this.projectionDays) {
+            titleText += ` (${this.analysisDays}d analysis + ${this.projectionDays}d projection)`;
+        } else {
+            titleText += ` (${this.currentTimeframe} days)`;
+        }
+        
+        // Update chart title
+        if (!this.priceChart.options.plugins.title) {
+            this.priceChart.options.plugins.title = { display: true };
+        }
+        
+        this.priceChart.options.plugins.title.text = titleText;
+        console.log(`📊 Chart title updated: ${titleText}`);
+    }
+
+    // Debug method to inspect analysis data
+    debugAnalysisTimeframe() {
+        if (!this.analysisData) {
+            console.log('❌ No analysis data available');
+            return;
+        }
+        
+        console.log('🔍 TIMEFRAME DEBUG INFO:');
+        console.log('📊 Raw analysis data keys:', Object.keys(this.analysisData));
+        
+        // Check all possible timeframe fields
+        const timeframeFields = [
+            'analysis_timeframe', 'timeframe', 'target_timeframe', 
+            'period_days', 'data_points_analyzed', 'timeframe_predictions'
+        ];
+        
+        timeframeFields.forEach(field => {
+            const value = this.analysisData[field];
+            console.log(`   ${field}: ${value} (${typeof value})`);
+        });
+        
+        if (this.chartVisualizationData) {
+            console.log('🎯 Chart visualization data available');
+            if (this.chartVisualizationData.targets) {
+                console.log(`   Targets: ${this.chartVisualizationData.targets.length}`);
+                this.chartVisualizationData.targets.forEach((target, i) => {
+                    console.log(`   Target ${i+1}: price=${target.price}, timeframe=${target.timeframe}`);
+                });
+            }
+        }
+    }
+
+    // Test method to validate timeframe alignment
+    testTimeframeAlignment() {
+        console.log('🧪 TESTING TIMEFRAME ALIGNMENT...');
+        
+        // Test with mock analysis data
+        this.analysisData = {
+            period_days: 90,
+            data_points_analyzed: 126, // 90 trading days
+            analysis_timeframe: '3_months',
+            target_timeframe: '1_month',
+            timeframe_predictions: 'Based on 1 month outlook, targets expected within 30 days'
+        };
+        
+        this.chartVisualizationData = {
+            targets: [
+                { price: 350, timeframe: '1_month' },
+                { price: 365, timeframe: '2_months' }
+            ]
+        };
+        
+        console.log('📊 Mock data created, running alignment...');
+        const updated = this.alignChartTimeframe();
+        
+        console.log(`✅ Test complete. Timeframe updated: ${updated}`);
+        console.log(`   Final timeframe: ${this.currentTimeframe} days`);
+        console.log(`   Analysis period: ${this.analysisDays} days`);
+        console.log(`   Projection period: ${this.projectionDays} days`);
+    }
+
+    // PATCH 8: Progress handling methods
+    // ADD these methods for enhanced progress tracking
+
+    showAnalysisProgress(update) {
+        if (update.stage) {
+            const stages = {
+                'data_loading': 'Loading market data...',
+                'analysis_running': 'Running technical analysis...',
+                'chart_generation': 'Generating chart data...',
+                'finalization': 'Finalizing results...'
+            };
+            
+            const message = stages[update.stage] || 'Processing...';
+            this.showStatusUpdate(`Processing: ${message}`, 'info');
+        }
+    }
+
+    handleDataLoadComplete(update) {
+        if (update.symbol && update.data_points) {
+            this.showStatusUpdate(`Data loaded: ${update.data_points} points for ${update.symbol}`, 'success');
+        }
+    }
+}
+
+
+
+
+
+// Initialize the app
+window.aladinApp = new ALADINStreamingClient();
+
+// Debug functions
+function toggleDebug() {
+    const debugPanel = document.getElementById('debug-panel');
+    debugPanel.style.display = debugPanel.style.display === 'none' ? 'block' : 'none';
+}
+
+// Expose functions for testing
+window.ALADIN = {
+    app: window.aladinApp,
+    testChart: () => window.aladinApp.testChartFunctionality(),
+    testStreaming: () => {
+        window.aladinApp.chatInput.value = 'analyze TEST';
+        window.aladinApp.sendMessage();
+    }
+};
+
+console.log('ai<strong>ai</strong>din Enhanced Visualization loaded');

@@ -1,0 +1,1948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ALADIN - Enhanced Chart Visualization</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+   <style>
+        :root {
+            --color-bg: #ffffff;
+            --color-text: #333333;
+            --color-border: #e9ecef;
+            --color-primary: #dc3545;
+            --color-success: #28a745;
+            --color-warning: #ffc107;
+            --color-info: #17a2b8;
+            --color-light: #f8f9fa;
+            --color-secondary: #6c757d;
+            --color-accent: #dc3545;
+            --color-ready: #28a745;
+            --color-processing: #ffc107;
+            --color-error: #dc3545;
+            --color-idle: #6c757d;
+            --font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+            --border-radius: 8px;
+            --box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            --transition: all 0.2s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-family);
+            color: var(--color-text);
+            background-color: var(--color-bg);
+            line-height: 1.5;
+            overflow: hidden;
+            font-size: 15px;
+        }
+
+        #aladin-container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header Styles */
+        #aladin-header {
+            background: linear-gradient(135deg, var(--color-light) 0%, #f1f5f9 100%);
+            border-bottom: 1.5px solid var(--color-border);
+            padding: 0.3rem 1rem;
+            flex-shrink: 0;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo-hero-black {
+            font-size: 2.5rem;
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+            letter-spacing: -0.02em;
+            margin: 0;
+        }
+
+
+        .logo-hero-black .thin {
+            font-weight: 100;
+            color: #000000;
+        }
+
+        .logo-hero-black .bold {
+            font-weight: 1000;
+            color: #000000;
+        }
+
+        .header-status {
+            font-size: 14px;
+            color: var(--color-text);
+            font-weight: 700;
+            margin-left: auto;
+            text-align: right;
+            letter-spacing: 0.3px;
+        }
+
+        .status-indicator {
+            color: var(--color-success);
+            font-size: 1rem;
+        }
+
+        /* Main Layout */
+        #aladin-main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            overflow: hidden;
+            gap: 0;
+        }
+
+        .panel {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            height: 100%;
+        }
+
+        .panel-header {
+            background: var(--color-light);
+            border-bottom: 1px solid var(--color-border);
+            padding: 0.75rem 1rem;
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--color-secondary);
+            display: none;
+        }
+
+        /* Chat Panel */
+        #chat-panel {
+            border-right: 1px solid var(--color-border);
+            background: #ffffff;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        /* Status Section */
+        .status-section {
+            background: var(--color-light);
+            border-bottom: 1px solid var(--color-border);
+            padding: 0.75rem 1rem;
+        }
+
+        .agent-list {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .agent-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 20px;
+        }
+
+        .agent-name {
+            color: var(--color-text);
+            font-weight: 500;
+        }
+
+        .agent-status-dot {
+            font-size: 0.9rem;
+            transition: var(--transition);
+        }
+
+        /* Agent Status Colors */
+        .agent-item.ready .agent-status-dot {
+            color: var(--color-ready);
+        }
+
+        .agent-item.processing .agent-status-dot {
+            color: var(--color-processing);
+        }
+
+        .agent-item.complete .agent-status-dot {
+            color: var(--color-success);
+        }
+
+        .agent-item.error .agent-status-dot {
+            color: var(--color-error);
+        }
+
+        .agent-item.idle .agent-status-dot {
+            color: var(--color-idle);
+        }
+
+        /* Chat History */
+        .chat-section {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            min-height: 0;
+            background: white;
+        }
+
+        .chat-message {
+            padding: 0.875rem 1.125rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 0.5rem;
+            font-size: 15px;
+            line-height: 1.5;
+            max-width: 85%;
+            animation: fadeInUp 0.3s ease;
+            word-wrap: break-word;
+            position: relative;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .chat-message.user {
+            background: linear-gradient(135deg, var(--color-primary), #e11d48);
+            color: white !important;
+            margin-left: auto;
+            margin-right: 0;
+            box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
+            border-bottom-right-radius: 4px;
+            text-align: left;
+        }
+
+        .chat-message.assistant {
+            background: rgba(248, 249, 250, 0.9);
+            border: 1px solid rgba(233, 236, 239, 0.8);
+            margin-left: 0;
+            margin-right: auto;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            border-bottom-left-radius: 4px;
+        }
+
+        .chat-message.system {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            margin: 0.5rem auto;
+            text-align: center;
+            max-width: 95%;
+        }
+
+        /* Input Section */
+        .input-section {
+            border-top: 1px solid var(--color-border);
+            padding: 1rem;
+            background: var(--color-light);
+            flex-shrink: 0;
+            min-height: 80px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 0.75rem;
+            align-items: flex-end;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+
+        #chat-input {
+            flex: 1;
+            width: 0;
+            min-width: 0;
+            padding: 0.875rem;
+            border: 1px solid var(--color-border);
+            border-radius: var(--border-radius);
+            font-family: var(--font-family);
+            font-size: 15px;
+            line-height: 1.4;
+            resize: none;
+            min-height: 45px;
+            max-height: 120px;
+            background: white;
+            transition: var(--transition);
+            box-sizing: border-box;
+        }
+
+        #chat-input:focus {
+            outline: none;
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.1);
+        }
+
+        #send-button {
+            padding: 0.875rem 1.5rem;
+            background: var(--color-primary);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            font-family: var(--font-family);
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            min-width: 80px;
+            height: 45px;
+            flex-shrink: 0;
+            box-sizing: border-box;
+        }
+
+        #send-button:hover {
+            background: #c82333;
+            box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
+        }
+
+        #send-button:disabled {
+            background: var(--color-secondary);
+            cursor: not-allowed;
+        }
+
+        /* Charts Panel */
+        #charts-panel {
+            background: #ffffff;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-content {
+            flex: 1;
+            padding: 0.5rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        /* Chart header with inline controls */
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            padding: 0 0.5rem;
+        }
+
+        .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--color-text);
+            margin: 0;
+        }
+
+        .chart-controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+
+
+        #price-chart-wrapper {
+            background: white;
+            border: 1px solid var(--color-border);
+            border-radius: var(--border-radius);
+            padding: 0.5rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            height: 450px;
+            position: relative;
+        }
+
+        #price-chart {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* Analysis Results */
+        #timeframe-selector {
+            padding: 0.25rem 0.5rem;
+            border: 1px solid var(--color-border);
+            border-radius: 4px;
+            font-size: 12px;
+            background: white;
+        }
+        /* Stagger annotation positions to avoid clogging */
+        .chart-annotation-stagger {
+            position: relative;
+        }
+
+        .chart-annotation-stagger:nth-child(odd) {
+            left: 10px;
+        }
+
+        .chart-annotation-stagger:nth-child(even) {
+            right: 10px;
+        }
+
+
+        /* Compact analysis results */
+        #analysis-results {
+            border-top: 1px solid var(--color-border);
+            padding: 0.75rem;
+            background: rgba(248, 249, 250, 0.5);
+            max-height: 200px; /* Reduced from 280px */
+            overflow-y: auto;
+        }
+
+        .analysis-summary {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+            margin-bottom: 1rem;
+        }
+
+        .analysis-summary h3 {
+            font-size: 18px;
+            margin-bottom: 1rem;
+            color: var(--color-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .analysis-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .analysis-meta p {
+            margin: 0;
+            padding: 0.5rem;
+            background: #f8f9fa;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .analysis-meta strong {
+            font-size: 0.85rem;
+            color: var(--color-secondary);
+            margin-bottom: 0.25rem;
+        }
+
+        .analysis-meta span {
+            font-weight: 600;
+            color: var(--color-text);
+        }
+
+        .level-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .support-badge {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .resistance-badge {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        /* Status Updates */
+        .status-update {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            border-radius: 5px;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+            transition: opacity 0.3s;
+        }
+
+        .status-info {
+            background: #007bff;
+        }
+
+        .status-success {
+            background: #28a745;
+        }
+
+        .status-error {
+            background: #dc3545;
+        }
+
+        .status-warning {
+            background: #ffc107;
+            color: #333;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 968px) {
+            #aladin-main {
+                grid-template-columns: 1fr;
+            }
+            
+            #chat-panel {
+                border-right: none;
+                border-bottom: 1px solid var(--color-border);
+                height: 40vh;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                gap: 0.2rem;
+                text-align: center;
+            }
+            
+            .logo-hero-black {
+                font-size: 2.8rem;
+            }
+            
+            .header-status {
+                font-size: 12px;
+                text-align: center;
+                margin-left: 0;
+                letter-spacing: 0.2px;
+            }
+            
+            .agent-list {
+                gap: 1rem;
+            }
+            
+            .agent-name {
+                font-size: 14px;
+            }
+            
+            .input-section {
+                padding: 0.75rem;
+            }
+            
+            #chat-input {
+                font-size: 16px;
+            }
+            
+            .chat-message {
+                max-width: 95%;
+            }
+
+            #price-chart-wrapper {
+                height: 350px;
+            }
+            .chart-header {
+                flex-direction: column;
+                gap: 0.5rem;
+                align-items: flex-start;
+            }
+        
+
+            .analysis-meta {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Loading Animation */
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Debug Panel */
+        .debug-panel {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 10000;
+            max-width: 400px;
+            max-height: 200px;
+            overflow: auto;
+            display: none;
+        }
+
+        .debug-toggle {
+            position: fixed;
+            bottom: 10px;
+            right: 420px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .data-mapping {
+            margin-top: 10px;
+            padding: 10px;
+            background: #2c3e50;
+            border-radius: 5px;
+        }
+
+        .data-mapping h5 {
+            margin: 0 0 8px 0;
+            color: #1abc9c;
+        }
+
+        .field-mapping {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+            font-size: 11px;
+        }
+
+        .field-name {
+            color: #3498db;
+        }
+
+        .field-value {
+            color: #e74c3c;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        /* Enhanced Styles for Analysis Summary */
+        
+        /* Enhanced Analysis Summary Styles */
+        .levels-section {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 3px solid #007bff;
+        }
+
+        .levels-section h4 {
+            margin: 0 0 0.75rem 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .level-detail {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .level-strength {
+            font-size: 0.75rem;
+            padding: 0.125rem 0.375rem;
+            border-radius: 3px;
+            background: #e9ecef;
+            color: #495057;
+            font-weight: 500;
+        }
+
+        .level-desc {
+            font-size: 0.75rem;
+            color: #6c757d;
+            font-style: italic;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Enhanced Chart Annotations */
+        .chart-annotation-label {
+            font-size: 10px !important;
+            font-weight: bold !important;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+
+        /* Status indicators */
+        .status-processing {
+            color: #ffc107;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Enhanced loading states */
+        .chart-loading {
+            position: relative;
+        }
+
+        .chart-loading::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(248, 249, 250, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .chart-loading::after {
+            content: 'Loading chart data...';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 11;
+            font-weight: 500;
+            color: #495057;
+        }
+
+
+
+    </style>
+</head>
+<body>
+    <div id="aladin-container">
+        <!-- Header -->
+        <header id="aladin-header">
+            <div class="header-content">
+                <h1 class="logo-hero-black">
+                    <span class="thin">al</span><span class="bold">a</span><span class="thin">d</span><span class="bold">i</span><span class="thin">n</span>
+                </h1>
+                <div class="header-content">
+                    Advanced Logic & Analysis Dashboard for Investment Navigation
+                </div>
+                <div class="header-status">
+                    <span id="system-status" class="status-indicator">●</span>
+                    <span id="session-info">Session: <span id="session-id">--</span></span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main id="aladin-main">
+            <!-- Chat Panel (Left) -->
+            <section id="chat-panel" class="panel">
+                <!-- Agent Status -->
+                <div id="agent-status" class="status-section">
+                    <div class="agent-list">
+                        <div class="agent-item" data-agent="data">
+                            <span class="agent-name">Data</span>
+                            <span class="agent-status-dot" id="data-status">●</span>
+                        </div>
+                        <div class="agent-item" data-agent="tools">
+                            <span class="agent-name">Tools</span>
+                            <span class="agent-status-dot" id="tools-status">●</span>
+                        </div>
+                        <div class="agent-item" data-agent="analysis">
+                            <span class="agent-name">Analysis</span>
+                            <span class="agent-status-dot" id="analysis-status">●</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat History -->
+                <div id="chat-history" class="chat-section">
+                    <!-- Messages will be added here dynamically -->
+                </div>
+
+                <!-- Chat Input -->
+                <div id="chat-input-section" class="input-section">
+                    <div class="input-container">
+                        <textarea 
+                            id="chat-input" 
+                            placeholder="Try: 'analyze BPCL' or 'compare VOLTAMP with sector'" 
+                            rows="1"></textarea>
+                        <button id="send-button" type="button">Send</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Charts Panel (Right) -->
+            <section id="charts-panel" class="panel">
+                <div class="panel-header">
+                    <h2>Interactive Charts</h2>
+                    <div class="chart-controls">
+                        <select id="timeframe-selector">
+                            <option value="7">1 Week</option>
+                            <option value="30" selected>1 Month</option>
+                            <option value="90">3 Months</option>
+                            <option value="180">6 Months</option>
+                            <option value="365">1 Year</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Chart Container -->
+                <div id="chart-container" class="chart-content" style="display: none;">
+                    <div id="price-chart-wrapper">
+                            <div class="chart-header">
+                                <h3 class="chart-title" id="dynamic-chart-title">${symbol} Price Chart (${this.currentDisplayDays} days)</h3>
+                                <div class="chart-controls">
+                                    <select id="timeframe-selector">
+                                        <option value="7">1 Week</option>
+                                        <option value="30" selected>1 Month</option>
+                                        <option value="90">3 Months</option>
+                                        <option value="180">6 Months</option>
+                                        <option value="365">1 Year</option>
+                                    </select>
+                                </div>
+                            </div>
+                        <canvas id="price-chart"></canvas>
+                    </div>
+                    <div id="analysis-results">
+                        <div id="insights-container">
+                            Analysis results will appear here
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chart Placeholder -->
+                <div id="chart-placeholder" class="chart-content">
+                    <div style="text-align: center; padding: 2rem; color: #6b7280;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">📊</div>
+                        <h3>No Chart Data</h3>
+                        <p>Charts will appear automatically when analysis completes</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <button class="debug-toggle" onclick="toggleDebug()">Toggle Debug</button>
+    <div class="debug-panel" id="debug-panel">
+        <h4>Debug Information</h4>
+        <div id="debug-content"></div>
+    </div>
+
+    <script>
+    // COMPLETE REPLACEMENT - Paste this to replace your current ALADINStreamingClient
+    // COMPLETE REPLACEMENT - Paste this to replace your current ALADINStreamingClient
+    // Wait for Chart.js and annotation plugin to load
+    document.addEventListener('DOMContentLoaded', function() {
+        // Register annotation plugin globally when page loads
+        if (typeof Chart !== 'undefined' && typeof ChartAnnotation !== 'undefined') {
+            Chart.register(ChartAnnotation);
+            console.log('✅ ChartAnnotation plugin registered globally');
+        } else {
+            console.error('❌ Chart.js or ChartAnnotation not available');
+            
+            // Retry after a short delay
+            setTimeout(() => {
+                if (typeof Chart !== 'undefined' && typeof ChartAnnotation !== 'undefined') {
+                    Chart.register(ChartAnnotation);
+                    console.log('✅ ChartAnnotation plugin registered (delayed)');
+                } else {
+                    console.error('❌ ChartAnnotation still not available after delay');
+                }
+            }, 1000);
+        }
+    });
+
+    // Alternative: Register plugin when first needed
+    window.ensureAnnotationPlugin = function() {
+        if (typeof ChartAnnotation !== 'undefined' && !Chart.registry.plugins.get('annotation')) {
+            Chart.register(ChartAnnotation);
+            console.log('✅ ChartAnnotation plugin registered on-demand');
+            return true;
+        }
+        return false;
+    };
+
+    class ALADINStreamingClient {
+        constructor() {
+            this.sessionId = null;
+            this.isProcessing = false;
+            this.currentSymbol = null;
+            this.priceChart = null;
+            this.analysisData = null;
+            this.chartVisualizationData = null;
+            this.currentTimeframe = 90; // Renamed from currentTimeframe
+            this.analysisPeriodDays = null; // From data_points_analyzed
+            this.projectionDays = 30; // From target_timeframe
+            
+            this.config = {
+                apiEndpoint: '/api/aladin/chat',
+                streamTimeout: 30000,
+                retryAttempts: 3,
+                retryDelay: 2000
+            };
+            
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => this.initializeApp());
+            } else {
+                this.initializeApp();
+            }
+        }
+
+        // PATCH 4: Replace your existing initializeApp() method with this enhanced version
+        initializeApp() {
+            console.log('🎯 Initializing ALADIN...');
+            
+            // Register Chart.js plugins first
+            try {
+                if (typeof ChartAnnotation !== 'undefined' && !Chart.registry.plugins.get('annotation')) {
+                    Chart.register(ChartAnnotation);
+                    console.log('✅ Chart annotation plugin registered');
+                }
+                
+                // Verify Chart.js is available
+                if (typeof Chart === 'undefined') {
+                    console.error('❌ Chart.js not available');
+                    this.showSystemMessage('Chart.js library not loaded', 'error');
+                    return;
+                }
+                
+            } catch (error) {
+                console.warn('⚠️ Chart plugin registration warning:', error);
+                // Continue initialization even if plugin registration fails
+            }
+            
+            // Core initialization
+            this.generateSessionId();
+            this.initializeUIElements();
+            this.setupEventListeners();
+            this.updateSessionInfo();
+            this.setSystemStatus('ready');
+            
+            // Verify essential DOM elements
+            const essentialElements = ['chat-input', 'send-button', 'chat-history', 'price-chart'];
+            const missingElements = essentialElements.filter(id => !document.getElementById(id));
+            
+            if (missingElements.length > 0) {
+                console.error('❌ Missing essential DOM elements:', missingElements);
+                this.showSystemMessage(`Missing UI elements: ${missingElements.join(', ')}`, 'error');
+                return;
+            }
+            
+            // Add welcome message
+            this.addChatMessage("Welcome to ALADIN! Try 'analyze BPCL'", 'assistant');
+            
+            console.log('✅ ALADIN ready - Chart.js:', !!window.Chart, 'Annotation plugin:', !!window.ChartAnnotation);
+            
+            // Focus chat input for better UX
+            if (this.chatInput) {
+                this.chatInput.focus();
+            }
+        }
+        generateSessionId() {
+            const timestamp = Date.now();
+            const randomPart = Math.random().toString(36).substr(2, 8);
+            this.sessionId = `web_${timestamp}_${randomPart}`;
+        }
+
+        initializeUIElements() {
+            this.chatInput = document.getElementById('chat-input');
+            this.sendButton = document.getElementById('send-button');
+            this.chatHistory = document.getElementById('chat-history');
+            this.sessionDisplay = document.getElementById('session-id');
+            this.systemStatus = document.getElementById('system-status');
+            this.timeframeSelector = document.getElementById('timeframe-selector');
+            this.dataStatus = document.getElementById('data-status');
+            this.toolsStatus = document.getElementById('tools-status');
+            this.analysisStatus = document.getElementById('analysis-status');
+            
+            this.setAgentStatus('data', 'ready');
+            this.setAgentStatus('tools', 'ready');
+            this.setAgentStatus('analysis', 'ready');
+        }
+
+        setupEventListeners() {
+            this.chatInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    this.sendMessage();
+                }
+            });
+            
+            this.sendButton.addEventListener('click', () => this.sendMessage());
+            
+            if (this.timeframeSelector) {
+                this.timeframeSelector.addEventListener('change', (e) => {
+                    if (this.analysisData) {
+                        // Use analysis data to calculate proper timeframe
+                        this.calculateChartPeriod();
+                    } else {
+                        this.currentTimeframe = parseInt(e.target.value);
+                    }
+                    
+                    if (this.currentSymbol) {
+                        this.loadAnalysisVisualization(this.currentSymbol);
+                    }
+                });
+            }
+            
+            this.chatInput.focus();
+        }
+
+        // CORE COMMUNICATION METHODS
+
+        async sendMessage() {
+            if (this.isProcessing || !this.chatInput) return;
+            
+            const message = this.chatInput.value.trim();
+            if (!message) return;
+            
+            this.addChatMessage(message, 'user');
+            this.chatInput.value = '';
+            this.setProcessingState(true);
+            
+            try {
+                await this.sendToBackend(message);
+            } catch (error) {
+                this.showSystemMessage(`Error: ${error.message}`, 'error');
+            } finally {
+                this.setProcessingState(false);
+            }
+        }
+
+        async sendToBackend(message) {
+            const response = await fetch(this.config.apiEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'text/event-stream, application/json'
+                },
+                body: JSON.stringify({
+                    message: message,
+                    session_id: this.sessionId
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const contentType = response.headers.get('content-type');
+            
+            if (contentType?.includes('text/event-stream')) {
+                this.setupEventSource(response);
+            } else {
+                const data = await response.json();
+                this.handleRegularResponse(data);
+            }
+        }
+
+        setupEventSource(response) {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            this.processStreamChunks(reader, decoder);
+        }
+
+        async processStreamChunks(reader, decoder) {
+            let buffer = '';
+            
+            try {
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+                    
+                    for (const line of lines) {
+                        this.processStreamLine(line);
+                    }
+                }
+            } catch (error) {
+                this.showSystemMessage(`Stream error: ${error.message}`, 'error');
+            }
+        }
+
+        processStreamLine(line) {
+            if (!line.trim() || !line.startsWith('data: ')) return;
+            
+            const dataStr = line.substring(6).trim();
+            if (dataStr === '[DONE]') return;
+            
+            try {
+                const data = JSON.parse(dataStr);
+                this.handleStreamUpdate(data);
+            } catch (error) {
+                console.warn('Failed to parse stream data:', dataStr);
+            }
+        }
+
+        handleStreamUpdate(update) {
+            // Just handle stream updates, no analysis detection
+            if (update.message) {
+                this.addChatMessage(update.message, 'assistant');
+            }
+            
+            if (update.agent_type || update.agent) {
+                this.setAgentStatus(update.agent_type || update.agent, update.status || 'processing');
+            }
+            
+            // Only load visualization if explicitly told by backend
+            if (update.type === 'load_chart' && update.symbol) {
+                this.loadAnalysisVisualization(update.symbol);
+            }
+        }
+
+        handleRegularResponse(data) {
+            if (data.error) {
+                this.showSystemMessage(data.error, 'error');
+                return;
+            }
+            
+            const responseText = data.chat_response || data.message || data.response;
+            if (responseText) {
+                this.addChatMessage(responseText);
+            }
+        }
+
+        // MAIN VISUALIZATION METHOD
+        // PATCH 3: Replace your existing loadAnalysisVisualization() method with this enhanced version
+        async loadAnalysisVisualization(symbol) {
+            try {
+                this.currentSymbol = symbol;
+                console.log(`📊 Loading enhanced visualization for ${symbol}`);
+                this.setSystemStatus('processing');
+                
+                // Show chart container and hide placeholder
+                const chartContainer = document.getElementById('chart-container');
+                const chartPlaceholder = document.getElementById('chart-placeholder');
+                if (chartContainer) chartContainer.style.display = 'block';
+                if (chartPlaceholder) chartPlaceholder.style.display = 'none';
+                
+                // Update title immediately
+                const titleElement = document.getElementById('analysis-title');
+                if (titleElement) titleElement.textContent = `📈 ${symbol} Analysis`;
+                
+                // Fetch analysis data first (contains chart visualization data)
+                console.log('🔍 Fetching analysis data...');
+                const analysisResponse = await fetch(`/api/aladin/analysis/${symbol}/latest`);
+                const analysisResult = await analysisResponse.json();
+                
+                if (analysisResult.success && analysisResult.data) {
+                    this.analysisData = analysisResult.data;
+                    this.chartVisualizationData = this.analysisData.chart_visualization_data;
+                    console.log('✅ Analysis data loaded:', {
+                        hasExecutiveSummary: !!this.analysisData.executive_summary,
+                        hasDetailedAnalysis: !!this.analysisData.detailed_analysis,
+                        hasChartData: !!this.chartVisualizationData,
+                        supportLevels: this.chartVisualizationData?.support_levels?.length || 0,
+                        resistanceLevels: this.chartVisualizationData?.resistance_levels?.length || 0
+                    });
+                    
+                    // Calculate proper timeframe from analysis data
+                    this.calculateChartPeriod();
+                } else {
+                    console.warn('⚠️ No analysis data available, using defaults');
+                    this.analysisData = null;
+                    this.chartVisualizationData = null;
+                }
+                
+                // Fetch OHLCV data with calculated timeframe
+                console.log(`📈 Fetching OHLCV data for ${this.currentTimeframe} days...`);
+                const ohlcvResponse = await fetch(`/api/aladin/chart/${symbol}/ohlcv?days=${this.chartDisplayDays}`);
+                const ohlcvResult = await ohlcvResponse.json();
+                
+                if (ohlcvResult.success && ohlcvResult.data?.length > 0) {
+                    console.log(`✅ OHLCV data fetched: ${ohlcvResult.data.length} data points`);
+                    
+                    // Create chart with proper error handling
+                    this.createChart(ohlcvResult.data, symbol);
+                    
+                    // Verify chart was created successfully
+                    if (this.priceChart) {
+                        console.log('✅ Chart created successfully');
+                        
+                        // Display analysis content
+                        this.displayAnalysis();
+                        this.setSystemStatus('ready');
+                        this.showStatusUpdate(`📊 Analysis loaded for ${symbol}`, 'success');
+                    } else {
+                        throw new Error('Chart creation failed - priceChart is null');
+                    }
+                    
+                } else {
+                    const errorMsg = ohlcvResult.error || 'No OHLCV data available';
+                    console.error('❌ OHLCV data fetch failed:', errorMsg);
+                    this.showStatusUpdate(`❌ No price data for ${symbol}`, 'error');
+                    this.setSystemStatus('error');
+                }
+                
+            } catch (error) {
+                console.error('❌ Error in loadAnalysisVisualization:', error);
+                this.showStatusUpdate(`❌ Visualization failed: ${error.message}`, 'error');
+                this.setSystemStatus('error');
+                
+                // Show detailed error for debugging
+                console.error('📋 Debug Info:', {
+                    currentSymbol: this.currentSymbol,
+                    hasAnalysisData: !!this.analysisData,
+                    hasChartData: !!this.chartVisualizationData,
+                    chartDisplayDays: this.chartDisplayDays,
+                    priceChartExists: !!this.priceChart
+                });
+            }
+        }
+
+        // UNIFIED CHART CREATION (replaces both createPriceChart and createEnhancedPriceChart)
+        // PATCH 1: Replace your existing createChart() method with this fixed version
+        createChart(ohlcvData, symbol) {
+            // Register annotation plugin if available and not already registered
+            if (typeof ChartAnnotation !== 'undefined' && !Chart.registry.plugins.get('annotation')) {
+                try {
+                    Chart.register(ChartAnnotation);
+                    console.log('✅ Annotation plugin registered in createChart');
+                } catch (error) {
+                    console.warn('⚠️ Could not register annotation plugin:', error);
+                }
+            }
+            
+            const ctx = document.getElementById('price-chart')?.getContext('2d');
+            
+            if (!ctx) {
+                console.error('❌ Price chart canvas not found or context unavailable');
+                this.showStatusUpdate('❌ Chart canvas error', 'error');
+                return;
+            }
+            
+            if (this.priceChart) {
+                this.priceChart.destroy();
+            }
+            
+            // Process data with gap removal
+            const processedData = this.processOHLCVData(ohlcvData);
+            if (processedData.length === 0) {
+                console.error('❌ No valid data points after processing');
+                this.showStatusUpdate('❌ No valid chart data', 'error');
+                return;
+            }
+            
+            console.log(`✅ Creating chart with ${processedData.length} data points`);
+            
+            processedData.sort((a, b) => a.x - b.x);
+            
+            try {
+                this.priceChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        datasets: [{
+                            label: `${symbol} Price`,
+                            data: processedData.map(d => ({x: d.x, y: d.c})),
+                            borderColor: '#dc3545',
+                            backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                            fill: true,
+                            tension: 0.1,
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
+                            pointBackgroundColor: '#dc3545',
+                            pointBorderColor: '#ffffff',
+                            pointBorderWidth: 2,
+                            spanGaps: false,
+                            segment: {
+                                borderColor: ctx => this.skipMissingData(ctx, '#dc3545'),
+                                borderDash: ctx => this.skipMissingData(ctx, [])
+                            }
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: `${symbol} Analysis`
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                callbacks: {
+                                    label: function(context) {
+                                        return `₹${context.parsed.y.toFixed(2)}`;
+                                    },
+                                    afterLabel: function(context) {
+                                        const dataPoint = processedData[context.dataIndex];
+                                        return dataPoint?.v ? `Volume: ${dataPoint.v.toLocaleString()}` : '';
+                                    }
+                                }
+                            },
+                            legend: { display: true, position: 'top' },
+                            annotation: { annotations: {} }
+                        },
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: {
+                                    unit: 'day',
+                                    tooltipFormat: 'MMM dd, yyyy',
+                                    displayFormats: { day: 'MMM dd' }
+                                },
+                                title: { display: true, text: 'Date' },
+                                grid: { color: 'rgba(0, 0, 0, 0.1)' },
+                                ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }
+                            },
+                            y: {
+                                title: { display: true, text: 'Price (₹)' },
+                                position: 'right',
+                                grid: { color: 'rgba(0, 0, 0, 0.1)' }
+                            }
+                        },
+                        interaction: { mode: 'nearest', axis: 'x', intersect: false }
+                    }
+                });
+                
+                console.log(`✅ Chart created successfully for ${symbol}`);
+                
+                // Add annotations and projections after chart is ready
+                this.addAnnotations();
+                this.addProjection();
+                this.updateTitle();
+                
+            } catch (error) {
+                console.error('❌ Chart creation failed:', error);
+                this.showStatusUpdate(`❌ Chart creation failed: ${error.message}`, 'error');
+                this.setSystemStatus('error');
+            }
+        }
+
+
+        createPriceChart(ohlcvData, symbol) {
+            return this.createChart(ohlcvData, symbol);
+        }
+        // DATA PROCESSING
+
+        processOHLCVData(ohlcvData) {
+            // Remove gaps first
+            const cleanedData = this.removeDataGaps(ohlcvData);
+            
+            return cleanedData.map(item => ({
+                x: new Date(item.timestamp),
+                o: parseFloat(item.open) || null,
+                h: parseFloat(item.high) || null,
+                l: parseFloat(item.low) || null,
+                c: parseFloat(item.close) || null,
+                v: parseFloat(item.volume) || null
+            })).filter(item => item.c !== null);
+        }
+
+        removeDataGaps(ohlcvData, gapThresholdDays = 3) {
+            if (!ohlcvData || ohlcvData.length < 2) return ohlcvData;
+            
+            const result = [];
+            const msPerDay = 24 * 60 * 60 * 1000;
+            const gapThreshold = gapThresholdDays * msPerDay;
+            
+            const sorted = [...ohlcvData].sort((a, b) => 
+                new Date(a.timestamp) - new Date(b.timestamp)
+            );
+            
+            result.push(sorted[0]);
+            
+            for (let i = 1; i < sorted.length; i++) {
+                const prevTime = new Date(sorted[i-1].timestamp).getTime();
+                const currentTime = new Date(sorted[i].timestamp).getTime();
+                const gap = currentTime - prevTime;
+                
+                if (gap > gapThreshold) {
+                    result.push({
+                        timestamp: new Date(prevTime + msPerDay).toISOString(),
+                        open: null, high: null, low: null, close: null, volume: null
+                    });
+                }
+                
+                result.push(sorted[i]);
+            }
+            
+            return result;
+        }
+
+        skipMissingData(ctx, defaultValue) {
+            if (!ctx.p0 || !ctx.p1) return defaultValue;
+            
+            const prevPoint = ctx.p0.parsed;
+            const currentPoint = ctx.p1.parsed;
+            
+            if (!prevPoint || !currentPoint) return defaultValue;
+            
+            const gap = currentPoint.x - prevPoint.x;
+            const dayInMs = 24 * 60 * 60 * 1000;
+            
+            return gap > 1.5 * dayInMs ? 'transparent' : defaultValue;
+        }
+
+        calculateChartPeriod() {
+            if (!this.analysisData) return;
+            
+            // Calculate analysis period from data points
+            const dataPoints = this.analysisData.data_points_analyzed || 180;
+            this.analysisPeriodDays = Math.ceil(dataPoints / 1.4); // Trading to calendar days
+            
+            // Calculate projection period
+            const targetTimeframe = this.analysisData.target_timeframe || '1_month';
+            this.projectionDays = this.parseTimeframeToDays(targetTimeframe);
+            
+            // Total chart period
+            this.currentTimeframe = this.analysisPeriodDays + this.projectionDays;
+            
+            console.log(`Chart period: ${this.analysisPeriodDays} analysis + ${this.projectionDays} projection = ${this.currentTimeframe} days`);
+        }
+
+        parseTimeframeToDays(timeframe) {
+            const mapping = {
+                '1_week': 7, '1_month': 30, '3_months': 90, 
+                '6_months': 180, '1_year': 365
+            };
+            return mapping[timeframe] || 30;
+        }
+
+        // CHART ANNOTATIONS
+        // PATCH 2: Replace your existing addAnnotations() method with this fixed version
+        addAnnotations() {
+            if (!this.priceChart || !this.chartVisualizationData) {
+                console.log('⚠️ No chart or visualization data for annotations');
+                return;
+            }
+            
+            console.log('🎯 Adding annotations with data:', this.chartVisualizationData);
+            
+            const data = this.chartVisualizationData;
+            
+            // Ensure annotation plugin is initialized
+            if (!this.priceChart.options.plugins.annotation) {
+                this.priceChart.options.plugins.annotation = { annotations: {} };
+            }
+            
+            // Clear existing annotations
+            this.priceChart.options.plugins.annotation.annotations = {};
+            
+            // Color helper functions
+            const getSupportColors = (strength) => {
+                const colorMap = {
+                    'strong': { border: '#1b5e20', bg: 'rgba(27, 94, 32, 0.8)' },
+                    'moderate': { border: '#43a047', bg: 'rgba(67, 160, 71, 0.8)' },
+                    'medium': { border: '#43a047', bg: 'rgba(67, 160, 71, 0.8)' },
+                    'weak': { border: '#81c784', bg: 'rgba(129, 199, 132, 0.8)' }
+                };
+                return colorMap[strength] || colorMap['medium'];
+            };
+            
+            const getResistanceColors = (strength) => {
+                const colorMap = {
+                    'strong': { border: '#b71c1c', bg: 'rgba(183, 28, 28, 0.8)' },
+                    'moderate': { border: '#e53935', bg: 'rgba(229, 57, 53, 0.8)' },
+                    'medium': { border: '#e53935', bg: 'rgba(229, 57, 53, 0.8)' },
+                    'weak': { border: '#ef9a9a', bg: 'rgba(239, 154, 154, 0.8)' }
+                };
+                return colorMap[strength] || colorMap['medium'];
+            };
+            
+            // Add Support Levels
+            if (data.support_levels?.length) {
+                console.log('📈 Adding support levels:', data.support_levels);
+                data.support_levels.forEach((level, i) => {
+                    const price = parseFloat(level.price || level);
+                    const strength = level.strength || 'medium';
+                    const colors = getSupportColors(strength);
+                    
+                    if (!isNaN(price)) {
+                        this.priceChart.options.plugins.annotation.annotations[`support-${i}`] = {
+                            type: 'line',
+                            mode: 'horizontal',
+                            scaleID: 'y',
+                            value: price,
+                            borderColor: colors.border,
+                            borderWidth: strength === 'strong' ? 3 : 2,
+                            borderDash: strength === 'strong' ? [] : [5, 5],
+                            label: {
+                                display: true,
+                                content: `S${i+1}: ₹${price}`,
+                                position: 'start',
+                                backgroundColor: colors.bg,
+                                color: 'white',
+                                font: { size: 11 },
+                                padding: 4
+                            }
+                        };
+                        console.log(`✅ Added support S${i+1} at ₹${price} (${strength})`);
+                    }
+                });
+            }
+            
+            // Add Resistance Levels
+            if (data.resistance_levels?.length) {
+                console.log('📉 Adding resistance levels:', data.resistance_levels);
+                data.resistance_levels.forEach((level, i) => {
+                    const price = parseFloat(level.price || level);
+                    const strength = level.strength || 'medium';
+                    const colors = getResistanceColors(strength);
+                    
+                    if (!isNaN(price)) {
+                        this.priceChart.options.plugins.annotation.annotations[`resistance-${i}`] = {
+                            type: 'line',
+                            mode: 'horizontal',
+                            scaleID: 'y',
+                            value: price,
+                            borderColor: colors.border,
+                            borderWidth: strength === 'strong' ? 3 : 2,
+                            borderDash: strength === 'strong' ? [] : [5, 5],
+                            label: {
+                                display: true,
+                                content: `R${i+1}: ₹${price}`,
+                                position: 'end',
+                                backgroundColor: colors.bg,
+                                color: 'white',
+                                font: { size: 11 },
+                                padding: 4
+                            }
+                        };
+                        console.log(`✅ Added resistance R${i+1} at ₹${price} (${strength})`);
+                    }
+                });
+            }
+            
+            // Add Floor/Ceiling Levels (Special handling)
+            if (data.floor_ceiling_levels) {
+                console.log('🏢 Adding floor/ceiling levels');
+                const floor = data.floor_ceiling_levels.buying_floor;
+                const ceiling = data.floor_ceiling_levels.selling_ceiling;
+                
+                if (floor?.price) {
+                    this.priceChart.options.plugins.annotation.annotations['floor'] = {
+                        type: 'line',
+                        mode: 'horizontal',
+                        scaleID: 'y',
+                        value: parseFloat(floor.price),
+                        borderColor: '#006400',
+                        borderWidth: 4,
+                        label: {
+                            display: true,
+                            content: `FLOOR: ₹${floor.price}`,
+                            position: 'start',
+                            backgroundColor: 'rgba(0, 100, 0, 0.9)',
+                            color: 'white',
+                            font: { size: 12, weight: 'bold' },
+                            padding: 6
+                        }
+                    };
+                    console.log(`✅ Added floor at ₹${floor.price}`);
+                }
+                
+                if (ceiling?.price) {
+                    this.priceChart.options.plugins.annotation.annotations['ceiling'] = {
+                        type: 'line',
+                        mode: 'horizontal',
+                        scaleID: 'y',
+                        value: parseFloat(ceiling.price),
+                        borderColor: '#8b0000',
+                        borderWidth: 4,
+                        label: {
+                            display: true,
+                            content: `CEILING: ₹${ceiling.price}`,
+                            position: 'start',
+                            backgroundColor: 'rgba(139, 0, 0, 0.9)',
+                            color: 'white',
+                            font: { size: 12, weight: 'bold' },
+                            padding: 6
+                        }
+                    };
+                    console.log(`✅ Added ceiling at ₹${ceiling.price}`);
+                }
+            }
+            
+            // Add Entry Zones (if available)
+            if (data.entry_points?.length) {
+                console.log('🎯 Adding entry zones');
+                data.entry_points.forEach((entry, i) => {
+                    if (entry.range_min && entry.range_max) {
+                        this.priceChart.options.plugins.annotation.annotations[`entry-zone-${i}`] = {
+                            type: 'box',
+                            xMin: this.priceChart.scales.x.min,
+                            xMax: this.priceChart.scales.x.max,
+                            yMin: parseFloat(entry.range_min),
+                            yMax: parseFloat(entry.range_max),
+                            backgroundColor: 'rgba(0, 123, 255, 0.15)',
+                            borderColor: 'rgba(0, 123, 255, 0.4)',
+                            borderWidth: 1
+                        };
+                        console.log(`✅ Added entry zone ${i+1}: ₹${entry.range_min}-${entry.range_max}`);
+                    }
+                });
+            }
+            
+            // Update chart to apply annotations
+            try {
+                this.priceChart.update('none'); // Use 'none' for faster updates
+                console.log('✅ Annotations successfully applied to chart');
+            } catch (error) {
+                console.error('❌ Error applying annotations:', error);
+            }
+        }
+        
+
+        addProjection() {
+            if (!this.chartVisualizationData?.targets?.length) return;
+            
+            const primaryTarget = this.chartVisualizationData.targets[0];
+            const targetPrice = primaryTarget.price || primaryTarget;
+            
+            if (!targetPrice || isNaN(targetPrice)) return;
+            
+            const chartData = this.priceChart.data.datasets[0].data;
+            const lastPoint = chartData[chartData.length - 1];
+            const currentPrice = lastPoint.y;
+            const currentTime = lastPoint.x;
+            
+            const futureTime = currentTime + (this.projectionDays * 24 * 60 * 60 * 1000);
+            
+            // Extend x-axis
+            this.priceChart.options.scales.x.max = futureTime;
+            
+            // Add projection line
+            this.priceChart.data.datasets.push({
+                label: `Target: ₹${targetPrice}`,
+                data: [
+                    { x: currentTime, y: currentPrice },
+                    { x: futureTime, y: targetPrice }
+                ],
+                borderColor: '#ff9500',
+                borderWidth: 3,
+                borderDash: [10, 5],
+                pointRadius: [0, 6],
+                pointBackgroundColor: ['transparent', '#ff9500'],
+                fill: false,
+                spanGaps: true
+            });
+        }
+
+        updateTitle() {
+            if (!this.priceChart) return;
+            
+            const hasProjection = this.chartVisualizationData?.targets?.length > 0;
+            const timeframeText = hasProjection ?
+                `${this.analysisPeriodDays} days + ${this.projectionDays}d projection` :
+                `${this.analysisPeriodDays} days`;
+                
+            this.priceChart.options.plugins.title.text = `${this.currentSymbol} (${timeframeText})`;
+            this.priceChart.update('none');
+        }
+
+        // RICH CONTENT DISPLAY (executive summary + detailed analysis)
+
+        displayAnalysis() {
+            const container = document.getElementById('insights-container');
+            if (!container || !this.analysisData) return;
+            
+            let html = '';
+            
+            // Executive Summary (no title, direct content)
+            if (this.analysisData.executive_summary) {
+                html += `<div class="executive-content">
+                    <p class="executive-text">${this.analysisData.executive_summary}</p>
+                </div>`;
+            }
+            
+            // Detailed Analysis (no title, formatted content)
+            if (this.analysisData.detailed_analysis) {
+                const formattedAnalysis = this.analysisData.detailed_analysis
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\n/g, '<br>');
+                html += `<div class="detailed-content">
+                    ${formattedAnalysis}
+                </div>`;
+            }
+            
+            // Trading Recommendations (compact)
+            if (this.analysisData.trading_recommendations) {
+                const formattedRecs = this.analysisData.trading_recommendations
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\n/g, '<br>');
+                html += `<div class="recommendations-content">
+                    ${formattedRecs}
+                </div>`;
+            }
+            
+            // If no rich content, show basic summary
+            if (!html) {
+                html = this.buildBasicSummary();
+            }
+            
+            container.innerHTML = html;
+        }
+
+        buildBasicSummary() {
+            const analysis = this.chartVisualizationData || this.analysisData;
+            if (!analysis) return '<p>No analysis available</p>';
+            
+            let html = '<div class="basic-summary">';
+            
+            if (analysis.current_price) {
+                html += `<p><strong>Price:</strong> ₹${analysis.current_price}</p>`;
+            }
+            if (analysis.action) {
+                html += `<p><strong>Action:</strong> ${analysis.action}</p>`;
+            }
+            if (analysis.conviction) {
+                html += `<p><strong>Conviction:</strong> ${analysis.conviction}</p>`;
+            }
+            
+            html += '</div>';
+            return html;
+        }
+
+        // STATUS & UI METHODS
+
+        updateSessionInfo() {
+            if (this.sessionDisplay) {
+                this.sessionDisplay.textContent = this.sessionId.substr(-8);
+            }
+        }
+
+        setSystemStatus(status) {
+            if (!this.systemStatus) return;
+            
+            this.systemStatus.classList.remove('ready', 'processing', 'error');
+            this.systemStatus.classList.add(status);
+            
+            const statusMap = { 'ready': '●', 'processing': '⚡', 'error': '⚠️' };
+            this.systemStatus.textContent = statusMap[status] || '●';
+        }
+
+        setAgentStatus(agent, status) {
+            const agentElement = document.querySelector(`.agent-item[data-agent="${agent}"]`);
+            if (!agentElement) return;
+            
+            agentElement.classList.remove('ready', 'processing', 'complete', 'error', 'idle');
+            agentElement.classList.add(status);
+        }
+
+        resetAgentStatus() {
+            ['data', 'tools', 'analysis'].forEach(agent => {
+                this.setAgentStatus(agent, 'ready');
+            });
+        }
+
+        setProcessingState(processing) {
+            this.isProcessing = processing;
+            
+            if (this.sendButton) {
+                this.sendButton.disabled = processing;
+                this.sendButton.textContent = processing ? 'Processing...' : 'Send';
+            }
+            
+            if (this.chatInput) {
+                this.chatInput.disabled = processing;
+            }
+            
+            this.setSystemStatus(processing ? 'processing' : 'ready');
+        }
+
+        addChatMessage(content, sender = 'assistant', type = 'normal') {
+            if (!this.chatHistory) return;
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${sender}`;
+            
+            if (type !== 'normal') {
+                messageDiv.classList.add(type);
+            }
+            
+            if (sender === 'user') {
+                messageDiv.innerHTML = `<strong>You:</strong> ${this.escapeHtml(content)}`;
+            } else if (sender === 'system') {
+                messageDiv.innerHTML = content;
+            } else {
+                messageDiv.innerHTML = `<strong>ALADIN:</strong> ${this.escapeHtml(content)}`;
+            }
+            
+            this.chatHistory.appendChild(messageDiv);
+            this.scrollToBottom();
+        }
+
+        showSystemMessage(message, type = 'system') {
+            this.addChatMessage(message, 'system', type);
+        }
+
+        showStatusUpdate(message, type = 'info') {
+            let statusDiv = document.getElementById('chart-status');
+            if (!statusDiv) {
+                statusDiv = document.createElement('div');
+                statusDiv.id = 'chart-status';
+                statusDiv.className = `status-update status-${type}`;
+                document.body.appendChild(statusDiv);
+            }
+            
+            statusDiv.textContent = message;
+            statusDiv.style.opacity = '1';
+            
+            if (type !== 'error') {
+                setTimeout(() => {
+                    if (statusDiv) statusDiv.style.opacity = '0';
+                }, 3000);
+            }
+        }
+
+        // UTILITY METHODS
+
+        escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        scrollToBottom() {
+            if (this.chatHistory) {
+                this.chatHistory.scrollTop = this.chatHistory.scrollHeight;
+            }
+        }
+
+        async testBPCLRealData() {
+            try {
+                this.currentSymbol = 'BPCL';
+                
+                // Real API calls
+                console.log('Fetching real BPCL analysis...');
+                const analysisResponse = await fetch('/api/aladin/analysis/BPCL/latest');
+                const analysisData = await analysisResponse.json();
+                console.log('Analysis data:', analysisData);
+                
+                console.log('Fetching real BPCL OHLCV...');
+                const ohlcvResponse = await fetch('/api/aladin/chart/BPCL/ohlcv?days=120');
+                const ohlcvData = await ohlcvResponse.json();
+                console.log('OHLCV data:', ohlcvData);
+                
+                if (analysisData.success) {
+                    this.analysisData = analysisData.data;
+                    this.chartVisualizationData = analysisData.data?.chart_visualization_data;
+                }
+                
+                if (ohlcvData.success) {
+                    this.createChart(ohlcvData.data, 'BPCL');
+                }
+                
+                this.displayAnalysis();
+                this.updateTitle();
+                
+            } catch (error) {
+                console.error('Real data test failed:', error);
+            }
+        }
+
+
+
+
+        // TEST METHOD
+        testChartFunctionality() {
+            const mockData = this.generateMockData();
+            this.createChart(mockData, 'TEST');
+            this.addMockAnalysis();
+            this.displayAnalysis();
+        }
+
+        generateMockData() {
+            const mockData = [];
+            const now = new Date();
+            
+            for (let i = 0; i < 20; i++) {
+                const date = new Date(now);
+                date.setDate(now.getDate() - (19 - i));
+                
+                if (date.getDay() >= 1 && date.getDay() <= 5) {
+                    mockData.push({
+                        timestamp: date.toISOString(),
+                        open: 320 + Math.random() * 20,
+                        high: 325 + Math.random() * 10,
+                        low: 315 + Math.random() * 10,
+                        close: 322 + Math.random() * 15,
+                        volume: 10000 + Math.floor(Math.random() * 5000)
+                    });
+                }
+            }
+            
+            return mockData;
+        }
+
+        // FIX 2: Replace your existing addMockAnalysis() method with this version that includes chart data
+        addMockAnalysis() {
+            this.analysisData = {
+                executive_summary: "Test stock showing bullish momentum with strong support at 320 levels.",
+                detailed_analysis: "**PRICE ACTION**: Strong uptrend with volume confirmation. **INDICATORS**: RSI at 65 shows momentum.",
+                trading_recommendations: "**BUY ZONE**: 320-325 range. **TARGET**: 350 levels. **STOP LOSS**: Below 315."
+            };
+            
+            // Add comprehensive chart visualization data for testing
+            this.chartVisualizationData = {
+                current_price: 332.50,
+                trend_direction: "bullish",
+                action: "BUY",
+                conviction: "HIGH",
+                
+                support_levels: [
+                    { price: 320, strength: 'strong', label: 'S1' },
+                    { price: 310, strength: 'medium', label: 'S2' },
+                    { price: 300, strength: 'weak', label: 'S3' }
+                ],
+                
+                resistance_levels: [
+                    { price: 340, strength: 'strong', label: 'R1' },
+                    { price: 355, strength: 'medium', label: 'R2' },
+                    { price: 375, strength: 'weak', label: 'R3' }
+                ],
+                
+                floor_ceiling_levels: {
+                    buying_floor: { price: 315, confidence: 85 },
+                    selling_ceiling: { price: 360, confidence: 80 }
+                },
+                
+                entry_points: [
+                    { range_min: 320, range_max: 325, type: 'buy_zone', confidence: 75 }
+                ],
+                
+                targets: [
+                    { price: 350, probability: 70, timeframe: '1_month' },
+                    { price: 365, probability: 50, timeframe: '3_months' }
+                ]
+            };
+            
+            console.log('✅ Mock analysis data created with full chart visualization data');
+        }
+        
+    }
+
+    // Initialize
+    window.aladinApp = new ALADINStreamingClient();
+    window.ALADIN = {
+        app: window.aladinApp,
+        testChart: () => window.aladinApp.testChartFunctionality()
+    };
+
+
+    </script>
+</body>
+</html>
