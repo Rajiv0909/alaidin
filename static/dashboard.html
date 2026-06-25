@@ -109,6 +109,8 @@ td { padding: 11px 10px; border-bottom: 1px solid #f0f0f0; font-variant-numeric:
 tr:last-child td { border: none; }
 tr.row { cursor: pointer; transition: background .15s; }
 tr.row:hover { background: var(--cream); }
+tr.capital-scaled { background: rgba(245, 158, 11, 0.07); }
+tr.capital-scaled:hover { background: rgba(245, 158, 11, 0.16); }
 
 /* ── Badges ── */
 .badge { display: inline-block; padding: 2px 8px; border-radius: 2px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; }
@@ -132,6 +134,7 @@ tr.row:hover { background: var(--cream); }
 .strat-row.active { background: rgba(245,197,24,.15); border-left: 3px solid var(--y); padding-left: 17px; }
 .strat-name-label { font-weight: 800; font-size: 14px; margin-bottom: 2px; letter-spacing: -.2px; }
 .strat-meta-label { font-size: 11px; color: var(--g); display: flex; align-items: center; gap: 5px; }
+.strat-desc-label { font-size: 10px; color: var(--mut); margin-top: 2px; }
 .strat-pnl { font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; }
 
 /* ── Refresh ticker ── */
@@ -279,6 +282,10 @@ input[type=checkbox] { accent-color: var(--y); width: 15px; height: 15px; cursor
 .badge-live   { background: rgba(22,163,74,.12); color: var(--pos); border: 1px solid var(--pos); }
 .badge-shadow { background: rgba(245,197,24,.18); color: #b45309; border: 1px solid var(--warn); }
 .badge-paused { background: rgba(220,38,38,.1); color: var(--neg); border: 1px solid var(--neg); }
+.badge-armed   { background: rgba(22,163,74,.18); color: var(--pos); border: 1px solid var(--pos); font-weight: 800; }
+.badge-disarmed { background: rgba(220,38,38,.1); color: var(--neg); border: 1px solid var(--neg); }
+.executor-bar { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #f9f9f7; border: 1px solid var(--hair); border-radius: var(--radius); margin-bottom: 16px; }
+.executor-bar .exec-status { flex: 1; font-size: 12px; color: var(--g); }
 .strat-tile-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin: 12px 0; }
 .strat-tile-stat .sv { font-size: 17px; font-weight: 800; }
 .strat-tile-stat .sl { font-size: 10px; color: var(--g); text-transform: uppercase; letter-spacing: .5px; }
@@ -584,6 +591,15 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
     <span>Admin view refreshes every 30s</span>
   </div>
 
+  <div class="admin-section-h">Executor Control</div>
+  <div class="executor-bar" id="executor-bar">
+    <span id="exec-badge" class="badge badge-disarmed">⚫ DISARMED</span>
+    <span class="exec-status" id="exec-status-text">—</span>
+    <span id="exec-cash" style="font-size:12px;color:var(--g);margin-left:6px;display:none"></span>
+    <button class="cmd-btn cmd-arm"    id="btn-exec-arm"    onclick="execCmd('arm')">Arm Trading</button>
+    <button class="cmd-btn cmd-disarm" id="btn-exec-disarm" onclick="execCmd('disarm')" disabled>Disarm</button>
+  </div>
+
   <div class="admin-section-h">Strategy Control</div>
   <div class="strat-grid" id="admin-strat-grid">
     <div class="empty">Loading strategies…</div>
@@ -628,10 +644,34 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
 
 <!-- Trade detail modal -->
 <div class="modal-overlay" id="trade-modal" onclick="closeModal(event)">
-  <div class="modal">
+  <div class="modal" style="width:560px;max-width:98vw">
     <button class="modal-close" onclick="document.getElementById('trade-modal').classList.remove('show')">×</button>
     <h3 id="modal-title">Trade Detail</h3>
     <div id="modal-body"></div>
+    <div id="fm-trail-section" style="display:none;margin-top:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--hair);padding-top:12px;cursor:pointer" onclick="toggleFmTrail()">
+        <span style="font-size:12px;font-weight:700;letter-spacing:.5px;color:var(--g)">FM REASONING TRAIL</span>
+        <span id="fm-trail-toggle" style="font-size:11px;color:var(--g)">▶ show</span>
+      </div>
+      <div id="fm-trail-body" style="display:none;margin-top:8px;overflow-x:auto">
+        <div id="fm-trail-loading" style="font-size:12px;color:var(--g);padding:8px 0">Loading…</div>
+        <table id="fm-trail-table" style="display:none;width:100%;border-collapse:collapse;font-size:11px">
+          <thead>
+            <tr style="color:var(--g);text-align:left;border-bottom:1px solid var(--hair)">
+              <th style="padding:4px 6px">Time</th>
+              <th style="padding:4px 6px">Stance</th>
+              <th style="padding:4px 6px">MFE%</th>
+              <th style="padding:4px 6px">Lock%</th>
+              <th style="padding:4px 6px">Ceil%</th>
+              <th style="padding:4px 6px">Conf</th>
+              <th style="padding:4px 6px;min-width:200px">Rationale</th>
+            </tr>
+          </thead>
+          <tbody id="fm-trail-rows"></tbody>
+        </table>
+        <div id="fm-trail-empty" style="display:none;font-size:12px;color:var(--g);padding:8px 0">No FM data for this trade.</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -653,6 +693,7 @@ let _obsTimer         = null;
 let _subscriptions    = [];
 let _currentView      = 'invest';
 const _specLoaded     = {};
+let _peakConcurrentCapital = 0;  // tracks max concurrent capital seen this session for ROC
 
 // ── Init ──────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -666,8 +707,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     _subscriptions = me.subscriptions || [];
 
     if (USER_ROLE === 'observer') {
-      document.getElementById('portfolio-section').style.display = 'none';
       document.getElementById('sidebar').style.display = 'none';
+      // Hide the subscriber live-positions table — observers see positions in strategy cards below
+      const liveWrap = document.getElementById('live-wrap');
+      const liveEmpty = document.getElementById('live-empty');
+      const liveCount = document.getElementById('live-count');
+      if (liveWrap)  liveWrap.style.display  = 'none';
+      if (liveEmpty) liveEmpty.style.display  = 'none';
+      if (liveCount) liveCount.style.display  = 'none';
     }
 
     if (USER_ROLE === 'subscriber') {
@@ -911,13 +958,15 @@ async function refreshObsStrategies() {
         const pnlTxt = (s.today_pnl_rs >= 0 ? '+' : '') + fmtRs(s.today_pnl_rs);
         const dotCls = s.mode === 'live' ? 'live' : 'shadow';
         const isActive = _selectedStrategy === s.strategy_id;
-        return `<div class="strat-row${isActive ? ' active' : ''}" data-sid="${s.strategy_id}" onclick="selectStratBreakdown('${s.strategy_id}', this)">
+        const sdesc = (STRAT_INFO[s.strategy_id] && STRAT_INFO[s.strategy_id][1]) || '';
+        return `<div class="strat-row${isActive ? ' active' : ''}" data-sid="${s.strategy_id}" onclick="selectStratBreakdown('${s.strategy_id}', this)" title="${sdesc}">
           <div>
             <div class="strat-name-label">${fmtStratName(s.strategy_id)}</div>
             <div class="strat-meta-label">
               <span class="dot ${dotCls}"></span>
               ${s.mode} · ${s.n_trades} trade${s.n_trades !== 1 ? 's' : ''}
             </div>
+            ${sdesc ? `<div class="strat-desc-label">${sdesc}</div>` : ''}
           </div>
           <div class="strat-pnl ${pnlCls}">${pnlTxt}</div>
         </div>`;
@@ -954,12 +1003,34 @@ async function refreshObsStrategies() {
                <button class="obs-act-btn btn-exit" onclick="posAction('${p.trade_id}','exit','${p.symbol}',event)">Exit</button>
              </div>`
           : '';
-        return `<tr>
+        // % indicators for LTP, stop, target
+        const ep     = p.entry_price  || 0;
+        const ltp    = p.current_price || ep;
+        const stop   = p.stop_price   || 0;
+        const tgt    = p.target_price || 0;
+        const isLng  = p.direction !== 'SHORT';
+        const gainPct = ep > 0 ? ((isLng ? ltp - ep : ep - ltp) / ep * 100) : 0;
+        const stopPct = ep > 0 ? ((isLng ? stop - ep : ep - stop) / ep * 100) : 0;
+        const tgtPct  = ep > 0 ? ((isLng ? tgt - ep : ep - tgt) / ep * 100) : 0;
+        const locked  = ep > 0 && (isLng ? stop > ep : stop < ep);
+        const ltpCell  = p.current_price
+          ? `${fmtRs(ltp)} <small style="color:${gainPct>=0?'var(--pos)':'var(--neg)'}">${gainPct>=0?'+':''}${gainPct.toFixed(1)}%</small>`
+          : '—';
+        const stopCell = stop
+          ? `${fmtRs(stop)} <small style="color:${locked?'var(--pos)':'var(--neg)'}">${locked?'🔒 ':''}${stopPct>=0?'+':''}${stopPct.toFixed(1)}%</small>`
+          : '—';
+        const tgtCell  = tgt
+          ? `${fmtRs(tgt)} <small style="color:var(--pos)">${tgtPct>=0?'+':''}${tgtPct.toFixed(1)}%</small>`
+          : '—';
+        const pmeta    = p.metadata || {};
+        const pScaled  = (pmeta.nifty_intra_scale != null && pmeta.nifty_intra_scale !== 1.0) ||
+                         (pmeta.presignal_scale    != null && pmeta.presignal_scale    !== 1.0);
+        return `<tr class="row${pScaled ? ' capital-scaled' : ''}" onclick="showTradeDetail(${JSON.stringify(JSON.stringify(p))})">
           <td>${p.symbol} ${dirBadge}</td>
           <td>${fmtRs(p.entry_price)}</td>
-          <td>${p.current_price ? fmtRs(p.current_price) : '—'}</td>
-          <td style="color:var(--neg)">${fmtRs(p.stop_price)}</td>
-          <td style="color:var(--pos)">${fmtRs(p.target_price)}</td>
+          <td>${ltpCell}</td>
+          <td style="color:var(--neg)">${stopCell}</td>
+          <td style="color:var(--pos)">${tgtCell}</td>
           <td class="${unrlCls}" style="font-weight:700">${unrlTxt}</td>
           <td style="color:var(--g)">${fmtK(p.capital_deployed)}</td>
           ${isOwner ? `<td>${actBtns}</td>` : ''}
@@ -1012,10 +1083,11 @@ async function refreshObsStrategies() {
         </div>`;
     }
 
+    const stratDesc = (STRAT_INFO[sid] && STRAT_INFO[sid][1]) || '';
     return `
     <div class="obs-card${disabledClass}">
       <div class="obs-card-head">
-        <span class="obs-strat-name">${fmtStratName(sid)}</span>
+        <span class="obs-strat-name" title="${stratDesc}">${fmtStratName(sid)}</span>
         <span class="obs-mode obs-mode-${s.mode}">${s.mode.toUpperCase()}</span>
       </div>
       <div class="obs-today-row">
@@ -1080,16 +1152,21 @@ function buildSidebar(subs) {
   });
 }
 
+const STRAT_INFO = {
+  'PVI':             ['Price Volume Imbalance', 'Gap-up pullback entry, Volume Profile exits (T1=POC/VAH, T2=VAL)'],
+  'BLOCK_DEAL_FADE': ['Block Deal Fade',        'Fade large institutional block prints — short the liquidity spike'],
+  'BLOCK_DEAL_BOUNCE':['Block Deal Bounce',     'Buy the institutional block print as a support signal'],
+  'ORB_SHORT':       ['Opening Range Breakout Short', 'OR breakdown after 09:30, vol 3×, VWAP filter'],
+  'FIB_RSI_023':     ['Fibonacci RSI',          'Fib 50–61.8% retracement SHORT after opening downswing, VIX rising'],
+  'BB_CCI_024':      ['BB + CCI Momentum',      'Bollinger Band squeeze + CCI cross below −100 SHORT'],
+  'EMA_BOS_026':     ['EMA Break of Structure', 'EMA9/21 bear cross + 15-min BOS SHORT, VIX 14–25'],
+  'HA_REVERSAL':     ['HA Supertrend',           'Heikin-Ashi 15-min trend SHORT, ST_FLIP or 3% stop exit'],
+  'FRS':             ['Failed Recovery Short',   'Multi-day cumulative drop, D-1 bounce, short the fade below VWAP'],
+  'EODR':            ['EOD Reversal Long',       'Buy after ≥2.5% late-session selloff, hold overnight'],
+};
+
 function fmtStratName(id) {
-  const map = {
-    'BLOCK_DEAL_FADE':   'Block Deal Fade',
-    'BLOCK_DEAL_BOUNCE': 'Block Deal Bounce',
-    'HA_REVERSAL':       'HA Reversal',
-    'BB_CCI_024':        'BB + CCI',
-    'FIB_RSI_023':       'Fib RSI',
-    'EMA_BOS_026':       'EMA BOS',
-  };
-  return map[id] || id;
+  return (STRAT_INFO[id] && STRAT_INFO[id][0]) || id.replace(/_/g, ' ');
 }
 
 function selectStrategy(el) {
@@ -1261,9 +1338,9 @@ async function fetchJson(url, opts) {
 }
 
 async function refreshAll() {
-  const tasks = [refreshObsStrategies(), refreshObsLive()];
+  const tasks = [refreshObsStrategies(), refreshObsLive(), refreshPnl(), refreshEquity()];
   if (USER_ROLE !== 'observer') {
-    tasks.push(refreshPnl(), refreshEquity(), refreshLive(), refreshHistory());
+    tasks.push(refreshLive(), refreshHistory());
   }
   await Promise.all(tasks);
 }
@@ -1348,6 +1425,25 @@ async function refreshPnl() {
   }
   const ptSubEl = document.getElementById('pertrade-sub');
   if (ptSubEl) ptSubEl.textContent = n_closed ? `over ${n_closed} closed trades` : '';
+
+  // ── Return on Concurrent Capital (today only) ────────────────────────────
+  if (_selectedPeriod === 'today') {
+    const concurrent = (ld?.capital?.sub_current_allocated) || 0;
+    const effective  = concurrent > 0 ? concurrent : _peakConcurrentCapital;
+    const ccEl  = document.getElementById('capital-current');
+    const ccSub = document.getElementById('capital-current-sub');
+    const kLabel = document.querySelector('#kpi-total .card:last-child .kpi-l');
+    if (kLabel) kLabel.textContent = 'Return on Capital';
+    if (effective > 0) {
+      const roc = (displayPnl / effective) * 100;
+      if (ccEl) { ccEl.textContent = (roc >= 0 ? '+' : '') + roc.toFixed(2) + '%'; ccEl.className = 'kpi-v ' + (roc >= 0 ? 'pos' : 'neg'); ccEl.style.fontSize = ''; }
+      const label = concurrent > 0 ? 'concurrent' : 'peak concurrent';
+      if (ccSub) ccSub.textContent = `₹${fmtNum(Math.round(displayPnl))} / ₹${fmtK(effective)} ${label}`;
+    } else {
+      if (ccEl)  { ccEl.textContent = '—'; ccEl.className = 'kpi-v'; }
+      if (ccSub) ccSub.textContent = 'No positions today';
+    }
+  }
 }
 
 async function refreshKitePnl() {
@@ -1480,11 +1576,16 @@ function renderHistLive() {
     const posId   = p.id;
     const sym     = (p.symbol || '—').replace(/'/g, "\\'");
     const qty     = p.qty != null ? p.qty : 1;
+    const meta    = p.metadata || {};
+    const isScaled = (meta.nifty_intra_scale != null && meta.nifty_intra_scale !== 1.0) ||
+                     (meta.presignal_scale    != null && meta.presignal_scale    !== 1.0);
     const actionBtns = posId
-      ? `<button class="sub-act-btn sub-act-exit"   onclick="subPosConfirm(${posId},'exit','${sym}',${qty})">Exit</button>` +
-        `<button class="sub-act-btn sub-act-double" onclick="subPosConfirm(${posId},'double','${sym}',${qty})">2×</button>`
+      ? `<span onclick="event.stopPropagation()">` +
+        `<button class="sub-act-btn sub-act-exit"   onclick="subPosConfirm(${posId},'exit','${sym}',${qty})">Exit</button>` +
+        `<button class="sub-act-btn sub-act-double" onclick="subPosConfirm(${posId},'double','${sym}',${qty})">2×</button>` +
+        `</span>`
       : '—';
-    return `<tr>
+    return `<tr class="row${isScaled ? ' capital-scaled' : ''}" onclick="showTradeDetail(${JSON.stringify(JSON.stringify(p))})">
       <td><strong>${p.symbol || '—'}</strong></td>
       <td style="color:var(--g);font-size:12px">${fmtStratName(p.strategy_id)}</td>
       <td><span class="badge badge-${dir.toLowerCase()}">${dir}</span></td>
@@ -1505,10 +1606,16 @@ async function refreshLive() {
 
   const curr = cap.sub_current_allocated;
   const cnt  = cap.sub_open_count || 0;
-  const ccEl = document.getElementById('capital-current');
-  const ccSub = document.getElementById('capital-current-sub');
-  if (ccEl)  ccEl.textContent  = curr ? '₹' + fmtNum(curr) : '—';
-  if (ccSub) ccSub.textContent = cnt ? `${cnt} open position${cnt !== 1 ? 's' : ''}` : 'No open positions';
+  if (curr > 0 && curr > _peakConcurrentCapital) _peakConcurrentCapital = curr;
+  // For non-today periods, update card directly. For today, refreshPnl() owns the card (ROC%).
+  if (_selectedPeriod !== 'today') {
+    const ccEl  = document.getElementById('capital-current');
+    const ccSub = document.getElementById('capital-current-sub');
+    const kLabel = document.querySelector('#kpi-total .card:last-child .kpi-l');
+    if (kLabel) kLabel.textContent = 'Capital';
+    if (ccEl)  { ccEl.textContent = curr ? '₹' + fmtNum(curr) : '—'; ccEl.className = 'kpi-v'; }
+    if (ccSub) ccSub.textContent = cnt ? `${cnt} open position${cnt !== 1 ? 's' : ''}` : 'No open positions';
+  }
 
   const pvEl = document.getElementById('pos-open-val');
   if (pvEl) pvEl.textContent = cnt || '—';
@@ -1552,11 +1659,16 @@ async function refreshLive() {
     const posId   = p.id;
     const sym     = (p.symbol || '—').replace(/'/g, "\\'");
     const qty     = p.qty != null ? p.qty : 1;
+    const meta    = p.metadata || {};
+    const isScaled = (meta.nifty_intra_scale != null && meta.nifty_intra_scale !== 1.0) ||
+                     (meta.presignal_scale    != null && meta.presignal_scale    !== 1.0);
     const actionBtns = posId
-      ? `<button class="sub-act-btn sub-act-exit"   onclick="subPosConfirm(${posId},'exit','${sym}',${qty})">Exit</button>` +
-        `<button class="sub-act-btn sub-act-double" onclick="subPosConfirm(${posId},'double','${sym}',${qty})">2×</button>`
+      ? `<span onclick="event.stopPropagation()">` +
+        `<button class="sub-act-btn sub-act-exit"   onclick="subPosConfirm(${posId},'exit','${sym}',${qty})">Exit</button>` +
+        `<button class="sub-act-btn sub-act-double" onclick="subPosConfirm(${posId},'double','${sym}',${qty})">2×</button>` +
+        `</span>`
       : '—';
-    return `<tr>
+    return `<tr class="row${isScaled ? ' capital-scaled' : ''}" onclick="showTradeDetail(${JSON.stringify(JSON.stringify(p))})">
       <td><strong>${p.symbol || '—'}</strong></td>
       <td style="color:var(--g);font-size:12px">${fmtStratName(p.strategy_id)}</td>
       <td><span class="badge badge-${dir.toLowerCase()}">${dir}</span></td>
@@ -1669,7 +1781,45 @@ function fmtAdminStratName(id) {
 }
 
 async function refreshAdmin() {
-  await Promise.all([refreshAdminStrategies()]);
+  await Promise.all([refreshAdminStrategies(), refreshExecutorStatus()]);
+}
+
+async function refreshExecutorStatus() {
+  const d = await fetchJson('/api/admin/executor/status');
+  if (d.error) return;
+  const badge    = document.getElementById('exec-badge');
+  const txt      = document.getElementById('exec-status-text');
+  const cashEl   = document.getElementById('exec-cash');
+  const armBtn   = document.getElementById('btn-exec-arm');
+  const disarmBtn = document.getElementById('btn-exec-disarm');
+  if (!badge) return;
+  if (d.armed) {
+    badge.className   = 'badge badge-armed';
+    badge.textContent = '🟢 ARMED';
+    armBtn.disabled   = true;
+    disarmBtn.disabled = false;
+    if (cashEl && d.cash != null) {
+      cashEl.textContent = '· Cash ₹' + Number(d.cash).toLocaleString('en-IN');
+      cashEl.style.display = '';
+    }
+  } else {
+    badge.className   = 'badge badge-disarmed';
+    badge.textContent = '⚫ DISARMED';
+    armBtn.disabled   = false;
+    disarmBtn.disabled = true;
+    if (cashEl) cashEl.style.display = 'none';
+  }
+  txt.textContent = d.ts ? `Since ${d.ts}` : (d.note || '—');
+}
+
+async function execCmd(cmd) {
+  const labels = {arm: 'Arm live trading — REAL ORDERS will be placed', disarm: 'Disarm live trading'};
+  if (!confirm(labels[cmd] + '?')) return;
+  const d = await fetchJson(`/api/admin/executor/${cmd}`, {method: 'POST'});
+  if (d.error) { alert('Error: ' + d.error); return; }
+  document.getElementById('exec-status-text').textContent = '⏳ Command sent — confirming…';
+  setTimeout(refreshExecutorStatus, 3000);
+  setTimeout(refreshExecutorStatus, 6000);
 }
 
 async function refreshAdminStrategies() {
@@ -1857,8 +2007,16 @@ function toggleCompleted() {
 }
 
 // ── Trade detail modal ────────────────────────────────────────────────────
+let _fmTrailLoaded = false;
+let _fmTrailOpen   = false;
+let _currentTradeForFm = null;
+
 function showTradeDetail(jsonStr) {
   const t = JSON.parse(jsonStr);
+  _currentTradeForFm = t;
+  _fmTrailLoaded = false;
+  _fmTrailOpen   = false;
+
   document.getElementById('modal-title').textContent = `${t.symbol} — ${t.strategy_id}`;
   const rows = [
     ['Symbol',    t.symbol],
@@ -1877,10 +2035,82 @@ function showTradeDetail(jsonStr) {
     ['Entry time', t.entry_time ? new Date(t.entry_time).toLocaleString('en-IN') : '—'],
     ['Exit time',  t.exit_time  ? new Date(t.exit_time).toLocaleString('en-IN')  : '—'],
   ];
+  if (t.metadata) {
+    const ns = t.metadata.nifty_intra_scale;
+    const ps = t.metadata.presignal_scale;
+    if (ns != null && ns !== 1.0) rows.push(['NIFTY scale', ns.toFixed(1) + '×']);
+    if (ps != null && ps !== 1.0) rows.push(['Presignal scale', ps.toFixed(2) + '×']);
+  }
   document.getElementById('modal-body').innerHTML = rows.map(([k,v]) =>
     `<div class="modal-row"><span class="k">${k}</span><span>${v}</span></div>`
   ).join('');
+
+  // Show FM trail section for PVI trades only
+  const fmSection = document.getElementById('fm-trail-section');
+  if ((t.strategy_id || '').toUpperCase() === 'PVI') {
+    fmSection.style.display = 'block';
+    document.getElementById('fm-trail-body').style.display = 'none';
+    document.getElementById('fm-trail-toggle').textContent = '▶ show';
+    document.getElementById('fm-trail-table').style.display = 'none';
+    document.getElementById('fm-trail-empty').style.display = 'none';
+    document.getElementById('fm-trail-rows').innerHTML = '';
+  } else {
+    fmSection.style.display = 'none';
+  }
+
   document.getElementById('trade-modal').classList.add('show');
+}
+
+async function toggleFmTrail() {
+  _fmTrailOpen = !_fmTrailOpen;
+  const body   = document.getElementById('fm-trail-body');
+  const toggle = document.getElementById('fm-trail-toggle');
+  body.style.display = _fmTrailOpen ? 'block' : 'none';
+  toggle.textContent = _fmTrailOpen ? '▼ hide' : '▶ show';
+  if (!_fmTrailOpen || _fmTrailLoaded) return;
+
+  const t = _currentTradeForFm;
+  if (!t || !t.entry_time) return;
+  const date = t.entry_time.slice(0, 10);
+
+  document.getElementById('fm-trail-loading').style.display = 'block';
+  document.getElementById('fm-trail-table').style.display   = 'none';
+  document.getElementById('fm-trail-empty').style.display   = 'none';
+
+  try {
+    const res  = await fetch(`/api/pvi/fm-trail?symbol=${encodeURIComponent(t.symbol)}&date=${date}`);
+    const data = await res.json();
+    const rows = data.trail || [];
+    _fmTrailLoaded = true;
+    document.getElementById('fm-trail-loading').style.display = 'none';
+
+    const stanceColor = s => {
+      if (!s) return '';
+      const su = s.toUpperCase();
+      if (su.includes('EXIT'))    return 'color:#e53935';
+      if (su.includes('PROTECT')) return 'color:#f0a500';
+      if (su.includes('LET') || su.includes('RUN')) return 'color:#43a047';
+      return '';
+    };
+
+    if (!rows.length) {
+      document.getElementById('fm-trail-empty').style.display = 'block';
+      return;
+    }
+    document.getElementById('fm-trail-rows').innerHTML = rows.map(r => `
+      <tr style="border-bottom:1px solid var(--hair)">
+        <td style="padding:4px 6px;white-space:nowrap">${r.bar_ist || '—'}</td>
+        <td style="padding:4px 6px;white-space:nowrap;font-weight:700;${stanceColor(r.stance)}">${r.stance || '—'}</td>
+        <td style="padding:4px 6px;text-align:right">${r.mfe_pct != null ? r.mfe_pct.toFixed(2)+'%' : '—'}</td>
+        <td style="padding:4px 6px;text-align:right">${r.lock_pct != null ? r.lock_pct.toFixed(2)+'%' : '—'}</td>
+        <td style="padding:4px 6px;text-align:right">${r.ceil_pct != null ? r.ceil_pct.toFixed(2)+'%' : '—'}</td>
+        <td style="padding:4px 6px;text-align:right">${r.confidence != null ? Math.round(r.confidence) : '—'}</td>
+        <td style="padding:4px 6px;color:var(--g)">${r.rationale || '—'}</td>
+      </tr>`).join('');
+    document.getElementById('fm-trail-table').style.display = 'table';
+  } catch(e) {
+    document.getElementById('fm-trail-loading').textContent = 'Failed to load FM trail.';
+  }
 }
 
 function closeModal(e) {
