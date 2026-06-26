@@ -177,6 +177,7 @@ input[type=checkbox] { accent-color: var(--y); width: 15px; height: 15px; cursor
 .modal-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--hair); font-size: 13px; }
 .modal-row:last-child { border-bottom: none; }
 .modal-row .k { color: var(--g); }
+.modal-sub { padding: 3px 0 3px 14px; font-size: 11px; opacity: 0.7; border-bottom: none; }
 .modal-close { float: right; background: none; border: none; color: var(--g); font-size: 20px; cursor: pointer; margin-top: -6px; }
 .confirm-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); display: none; z-index: 1100; align-items: center; justify-content: center; }
 .confirm-modal-overlay.show { display: flex; }
@@ -220,6 +221,7 @@ input[type=checkbox] { accent-color: var(--y); width: 15px; height: 15px; cursor
 .obs-mode-shadow   { background: rgba(245,197,24,.18); color: #92690a; }
 .obs-mode-disabled { background: rgba(150,150,150,.1); color: var(--g); }
 .obs-card-disabled { opacity: .55; }
+.obs-card-shadow   { border-color: rgba(245,197,24,.35); background: rgba(245,197,24,.025); opacity: .82; }
 .obs-today-row { display: grid; grid-template-columns: repeat(5,1fr); gap: 8px; margin-bottom: 14px; }
 .obs-stat .k { font-size: 10px; color: var(--g); font-weight: 800; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 2px; }
 .obs-stat .v { font-size: 16px; font-weight: 800; }
@@ -986,7 +988,7 @@ async function refreshObsStrategies() {
     const wr      = s.n_trades ? Math.round(s.win_rate * 100) : null;
     const todCls  = s.today_pnl_rs >= 0 ? 'green' : 'red';
     const avgCls  = s.avg_trade_rs >= 0 ? 'green' : 'red';
-    const disabledClass = s.mode === 'disabled' ? ' obs-card-disabled' : '';
+    const cardClass = s.mode === 'disabled' ? ' obs-card-disabled' : (s.mode === 'shadow' ? ' obs-card-shadow' : '');
 
     const myLive  = live.filter(p => p.strategy_id === sid);
     let liveHtml  = '';
@@ -1085,7 +1087,7 @@ async function refreshObsStrategies() {
 
     const stratDesc = (STRAT_INFO[sid] && STRAT_INFO[sid][1]) || '';
     return `
-    <div class="obs-card${disabledClass}">
+    <div class="obs-card${cardClass}">
       <div class="obs-card-head">
         <span class="obs-strat-name" title="${stratDesc}">${fmtStratName(sid)}</span>
         <span class="obs-mode obs-mode-${s.mode}">${s.mode.toUpperCase()}</span>
@@ -1426,10 +1428,10 @@ async function refreshPnl() {
   const ptSubEl = document.getElementById('pertrade-sub');
   if (ptSubEl) ptSubEl.textContent = n_closed ? `over ${n_closed} closed trades` : '';
 
-  // ── Return on Concurrent Capital (today only) ────────────────────────────
+  // ── Return on Peak Concurrent Capital (today only) ──────────────────────
   if (_selectedPeriod === 'today') {
     const concurrent = (ld?.capital?.sub_current_allocated) || 0;
-    const effective  = concurrent > 0 ? concurrent : _peakConcurrentCapital;
+    const effective  = (ld?.capital?.peak_concurrent_today) || _peakConcurrentCapital || concurrent;
     const ccEl  = document.getElementById('capital-current');
     const ccSub = document.getElementById('capital-current-sub');
     const kLabel = document.querySelector('#kpi-total .card:last-child .kpi-l');
@@ -1437,8 +1439,7 @@ async function refreshPnl() {
     if (effective > 0) {
       const roc = (displayPnl / effective) * 100;
       if (ccEl) { ccEl.textContent = (roc >= 0 ? '+' : '') + roc.toFixed(2) + '%'; ccEl.className = 'kpi-v ' + (roc >= 0 ? 'pos' : 'neg'); ccEl.style.fontSize = ''; }
-      const label = concurrent > 0 ? 'concurrent' : 'peak concurrent';
-      if (ccSub) ccSub.textContent = `₹${fmtNum(Math.round(displayPnl))} / ₹${fmtK(effective)} ${label}`;
+      if (ccSub) ccSub.textContent = `₹${fmtNum(Math.round(displayPnl))} / ₹${fmtK(effective)} peak concurrent`;
     } else {
       if (ccEl)  { ccEl.textContent = '—'; ccEl.className = 'kpi-v'; }
       if (ccSub) ccSub.textContent = 'No positions today';
@@ -2027,6 +2028,16 @@ function showTradeDetail(jsonStr) {
     ['Qty',       t.qty != null  ? t.qty : '—'],
     ['Gross P&L', t.gross_pnl_rs != null ? fmtRs(t.gross_pnl_rs) : '—'],
     ['Charges',   t.charges_rs   != null ? '₹' + fmtNum(t.charges_rs) : '—'],
+  ];
+  if (t.charges_breakdown) {
+    const bd = t.charges_breakdown;
+    rows.push([' Brokerage',   `₹${(bd.brokerage||0).toFixed(2)}`, true]);
+    rows.push([' STT',         `₹${(bd.stt||0).toFixed(2)}`,       true]);
+    rows.push([' Exchange',    `₹${(bd.exchange||0).toFixed(2)}`,   true]);
+    rows.push([' SEBI+Stamp',  `₹${((bd.sebi||0)+(bd.stamp||0)).toFixed(2)}`, true]);
+    rows.push([' GST',         `₹${(bd.gst||0).toFixed(2)}`,        true]);
+  }
+  rows.push(
     ['Net P&L',   t.net_pnl_rs   != null ? fmtRs(t.net_pnl_rs) : '—'],
     ['Exit Type', t.exit_type || '—'],
     ['Zone',      t.zone || '—'],
@@ -2034,15 +2045,15 @@ function showTradeDetail(jsonStr) {
     ['Status',    t.status || '—'],
     ['Entry time', t.entry_time ? new Date(t.entry_time).toLocaleString('en-IN') : '—'],
     ['Exit time',  t.exit_time  ? new Date(t.exit_time).toLocaleString('en-IN')  : '—'],
-  ];
+  );
   if (t.metadata) {
     const ns = t.metadata.nifty_intra_scale;
     const ps = t.metadata.presignal_scale;
     if (ns != null && ns !== 1.0) rows.push(['NIFTY scale', ns.toFixed(1) + '×']);
     if (ps != null && ps !== 1.0) rows.push(['Presignal scale', ps.toFixed(2) + '×']);
   }
-  document.getElementById('modal-body').innerHTML = rows.map(([k,v]) =>
-    `<div class="modal-row"><span class="k">${k}</span><span>${v}</span></div>`
+  document.getElementById('modal-body').innerHTML = rows.map(([k, v, isSub]) =>
+    `<div class="modal-row${isSub ? ' modal-sub' : ''}"><span class="k">${k}</span><span>${v}</span></div>`
   ).join('');
 
   // Show FM trail section for PVI trades only
