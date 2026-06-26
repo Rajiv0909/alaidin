@@ -441,7 +441,7 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
   <!-- Toggle row: net P&L switch + today-only Kite toggle -->
   <div class="toggle-row" style="justify-content:space-between;align-items:center">
     <label><input type="checkbox" id="show-net" checked onchange="refreshPnl()"> Show Net P&L (after charges)</label>
-    <div class="tabs" id="data-source-tabs" style="margin:0">
+    <div class="tabs" id="data-source-tabs" style="margin:0;display:none">
       <button class="tab active" id="ds-total" onclick="switchDataSource('total')">Total</button>
       <button class="tab" id="ds-kite" onclick="switchDataSource('kite')">Kite</button>
     </div>
@@ -1226,6 +1226,14 @@ function selectPeriod(el) {
   el.classList.add('active');
   _selectedPeriod = el.dataset.period;
   _page = 1;
+  // Kite tab only applies to Today (Kite API has no historical data)
+  const tabs = document.getElementById('data-source-tabs');
+  if (_selectedPeriod === 'today') {
+    tabs.style.display = '';
+  } else {
+    tabs.style.display = 'none';
+    if (_dataSource === 'kite') switchDataSource('total');
+  }
   refreshPnl();
   refreshHistory();
 }
@@ -1340,7 +1348,7 @@ async function refreshAll() {
 }
 
 async function refreshPnl() {
-  if (_dataSource === 'kite') {
+  if (_dataSource === 'kite' && _selectedPeriod === 'today') {
     return refreshKitePnl();
   }
   const showNet = document.getElementById('show-net').checked;
@@ -1422,8 +1430,8 @@ async function refreshPnl() {
 
   // ── Return on Peak Concurrent Capital (all periods) ────────────────────
   {
-    const effective = (d.totals?.peak_concurrent_capital) ||
-                      (ld?.capital?.peak_concurrent_today) ||
+    const effective = (d.totals?.peak_daily_capital) ||
+                      (ld?.capital?.peak_daily_capital) ||
                       _peakConcurrentCapital;
     const ccEl  = document.getElementById('capital-current');
     const ccSub = document.getElementById('capital-current-sub');
