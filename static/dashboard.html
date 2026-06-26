@@ -441,7 +441,7 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
   <!-- Toggle row: net P&L switch + today-only Kite toggle -->
   <div class="toggle-row" style="justify-content:space-between;align-items:center">
     <label><input type="checkbox" id="show-net" checked onchange="refreshPnl()"> Show Net P&L (after charges)</label>
-    <div class="tabs" id="data-source-tabs" style="margin:0;display:none">
+    <div class="tabs" id="data-source-tabs" style="margin:0">
       <button class="tab active" id="ds-total" onclick="switchDataSource('total')">Total</button>
       <button class="tab" id="ds-kite" onclick="switchDataSource('kite')">Kite</button>
     </div>
@@ -1226,14 +1226,6 @@ function selectPeriod(el) {
   el.classList.add('active');
   _selectedPeriod = el.dataset.period;
   _page = 1;
-  // Kite tab only applies to Today (Kite API has no historical data)
-  const tabs = document.getElementById('data-source-tabs');
-  if (_selectedPeriod === 'today') {
-    tabs.style.display = '';
-  } else {
-    tabs.style.display = 'none';
-    if (_dataSource === 'kite') switchDataSource('total');
-  }
   refreshPnl();
   refreshHistory();
 }
@@ -1317,8 +1309,9 @@ function renderKiteHistory(closed) {
     const typeTag = p.is_overnight
       ? '<span style="font-size:10px;color:#f0a500;margin-left:4px">CNC</span>'
       : '';
+    const dateLabel = p.trade_date || 'today';
     return `<tr>
-      <td>today</td>
+      <td>${dateLabel}</td>
       <td><strong>${p.symbol}</strong>${typeTag}</td>
       <td>${fmtStratName(p.strategy_id || '?')}</td>
       <td><span class="badge badge-${dir.toLowerCase()}">${dir}</span></td>
@@ -1348,7 +1341,7 @@ async function refreshAll() {
 }
 
 async function refreshPnl() {
-  if (_dataSource === 'kite' && _selectedPeriod === 'today') {
+  if (_dataSource === 'kite') {
     return refreshKitePnl();
   }
   const showNet = document.getElementById('show-net').checked;
@@ -1450,7 +1443,8 @@ async function refreshPnl() {
 }
 
 async function refreshKitePnl() {
-  const d = await fetchJson('/api/subscriber/kite-pnl');
+  const qs = new URLSearchParams({ period: _selectedPeriod });
+  const d = await fetchJson('/api/subscriber/kite-pnl?' + qs);
   if (d.error) {
     document.getElementById('pnl-val').textContent = d.error === 'kite_unavailable' ? 'Offline' : 'Error';
     document.getElementById('pnl-sub').textContent = 'Kite not available';
@@ -1464,13 +1458,15 @@ async function refreshKitePnl() {
   const n_open   = totals.n_open   || 0;
   const wins     = totals.n_wins   || 0;
   const totalGross = closed + openUnr;
+  const isHistorical = d.source === 'db_fills';
 
   const pnlEl = document.getElementById('pnl-val');
   pnlEl.textContent = fmtRs(totalGross);
   pnlEl.className = 'kpi-v ' + (totalGross >= 0 ? 'pos' : 'neg');
   document.getElementById('kpi-l-pnl').textContent = 'Gross P&L';
-  document.getElementById('pnl-sub').textContent =
-    `Closed ₹${fmtNum(closed)}  ·  Unrealised ₹${fmtNum(openUnr)}`;
+  document.getElementById('pnl-sub').textContent = isHistorical
+    ? `Closed gross ₹${fmtNum(closed)}  ·  from Kite fill prices`
+    : `Closed ₹${fmtNum(closed)}  ·  Unrealised ₹${fmtNum(openUnr)}`;
 
   const tvEl = document.getElementById('trades-val');
   if (tvEl) tvEl.textContent = (n_closed + n_open) + (n_open ? ` +${n_open}` : '');
