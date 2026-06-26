@@ -221,7 +221,7 @@ input[type=checkbox] { accent-color: var(--y); width: 15px; height: 15px; cursor
 .obs-mode-shadow   { background: rgba(245,197,24,.18); color: #92690a; }
 .obs-mode-disabled { background: rgba(150,150,150,.1); color: var(--g); }
 .obs-card-disabled { opacity: .55; }
-.obs-card-shadow   { border-color: rgba(245,197,24,.35); background: rgba(245,197,24,.025); opacity: .82; }
+.obs-card-shadow   { opacity: .6; filter: saturate(.4); }
 .obs-today-row { display: grid; grid-template-columns: repeat(5,1fr); gap: 8px; margin-bottom: 14px; }
 .obs-stat .k { font-size: 10px; color: var(--g); font-weight: 800; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 2px; }
 .obs-stat .v { font-size: 16px; font-weight: 800; }
@@ -441,7 +441,7 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
   <!-- Toggle row: net P&L switch + today-only Kite toggle -->
   <div class="toggle-row" style="justify-content:space-between;align-items:center">
     <label><input type="checkbox" id="show-net" checked onchange="refreshPnl()"> Show Net P&L (after charges)</label>
-    <div class="tabs" id="data-source-tabs" style="margin:0;display:none">
+    <div class="tabs" id="data-source-tabs" style="margin:0">
       <button class="tab active" id="ds-total" onclick="switchDataSource('total')">Total</button>
       <button class="tab" id="ds-kite" onclick="switchDataSource('kite')">Kite</button>
     </div>
@@ -1226,14 +1226,6 @@ function selectPeriod(el) {
   el.classList.add('active');
   _selectedPeriod = el.dataset.period;
   _page = 1;
-  // Kite toggle only makes sense for Today
-  const tabs = document.getElementById('data-source-tabs');
-  if (_selectedPeriod === 'today') {
-    tabs.style.display = '';
-  } else {
-    tabs.style.display = 'none';
-    if (_dataSource === 'kite') switchDataSource('total');
-  }
   refreshPnl();
   refreshHistory();
 }
@@ -1348,7 +1340,7 @@ async function refreshAll() {
 }
 
 async function refreshPnl() {
-  if (_dataSource === 'kite' && _selectedPeriod === 'today') {
+  if (_dataSource === 'kite') {
     return refreshKitePnl();
   }
   const showNet = document.getElementById('show-net').checked;
@@ -1428,10 +1420,11 @@ async function refreshPnl() {
   const ptSubEl = document.getElementById('pertrade-sub');
   if (ptSubEl) ptSubEl.textContent = n_closed ? `over ${n_closed} closed trades` : '';
 
-  // ── Return on Peak Concurrent Capital (today only) ──────────────────────
-  if (_selectedPeriod === 'today') {
-    const concurrent = (ld?.capital?.sub_current_allocated) || 0;
-    const effective  = (ld?.capital?.peak_concurrent_today) || _peakConcurrentCapital || concurrent;
+  // ── Return on Peak Concurrent Capital (all periods) ────────────────────
+  {
+    const effective = (d.totals?.peak_concurrent_capital) ||
+                      (ld?.capital?.peak_concurrent_today) ||
+                      _peakConcurrentCapital;
     const ccEl  = document.getElementById('capital-current');
     const ccSub = document.getElementById('capital-current-sub');
     const kLabel = document.querySelector('#kpi-total .card:last-child .kpi-l');
@@ -1439,10 +1432,11 @@ async function refreshPnl() {
     if (effective > 0) {
       const roc = (displayPnl / effective) * 100;
       if (ccEl) { ccEl.textContent = (roc >= 0 ? '+' : '') + roc.toFixed(2) + '%'; ccEl.className = 'kpi-v ' + (roc >= 0 ? 'pos' : 'neg'); ccEl.style.fontSize = ''; }
-      if (ccSub) ccSub.textContent = `₹${fmtNum(Math.round(displayPnl))} / ₹${fmtK(effective)} peak concurrent`;
+      const periodLabel = _selectedPeriod === 'today' ? 'peak today' : (_selectedPeriod === 'fy' ? 'peak FY' : 'peak all-time');
+      if (ccSub) ccSub.textContent = `₹${fmtNum(Math.round(displayPnl))} / ₹${fmtK(effective)} ${periodLabel}`;
     } else {
       if (ccEl)  { ccEl.textContent = '—'; ccEl.className = 'kpi-v'; }
-      if (ccSub) ccSub.textContent = 'No positions today';
+      if (ccSub) ccSub.textContent = 'No positions';
     }
   }
 }
