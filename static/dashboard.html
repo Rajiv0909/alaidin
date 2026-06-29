@@ -374,6 +374,8 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
 .st-tile { border: 2px solid var(--hair); border-radius: var(--radius); padding: 14px 16px; cursor: pointer; transition: border-color .15s, background .15s; background: var(--w); }
 .st-tile.active { border-color: var(--k); border-left: 5px solid var(--y); background: var(--cream); padding-left: 13px; }
 .st-tile:hover:not(.active) { border-color: #bbb; }
+.st-tile-shadow { opacity: .6; filter: saturate(.3); }
+.agent-chip { font-size:9px; font-weight:700; padding:1px 5px; border-radius:2px; background:rgba(99,102,241,.1); color:#6366f1; white-space:nowrap; }
 .st-tile-name { font-size: 12px; font-weight: 800; letter-spacing: -.2px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .st-tile-pnl  { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
 .st-tile-meta { font-size: 10px; color: var(--g); margin-top: 4px; display: flex; align-items: center; gap: 5px; }
@@ -485,48 +487,37 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
   <input type="number" id="investment-input" style="display:none">
   <span id="investment-status" style="display:none"></span>
 
-  <!-- Equity curve + live positions below | By strategy list -->
+  <!-- Equity curve + timeline | Strategy tiles right panel -->
   <div class="two">
     <div class="card">
       <h3>Equity curve <em>cumulative net P&L</em></h3>
       <canvas id="equity-chart"></canvas>
       <div id="chart-empty" class="empty" style="display:none">No closed trades yet.</div>
-      <div style="margin-top:14px;border-top:1px solid var(--hair);padding-top:12px">
+      <div style="margin-top:14px;border-top:1px solid var(--hair);padding-top:10px">
         <div style="font-size:11px;font-weight:800;color:var(--g);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:baseline">
-          <span>Live positions</span><em id="live-count" style="font-style:normal;font-weight:500;color:#bbb;text-transform:none;letter-spacing:.3px"></em>
+          <span>Intraday timeline — <span id="tl-strat-label" style="font-weight:500;text-transform:none;letter-spacing:normal;color:#bbb">all strategies</span></span>
         </div>
-        <div id="stale-notice" class="stale-notice"></div>
-        <div id="live-wrap" style="overflow-x:auto">
-          <table style="min-width:500px">
-            <thead><tr>
-              <th>Symbol</th><th>Strategy</th><th>Dir</th>
-              <th>Entry</th><th>Unr. P&L</th><th>Entered</th><th>Actions</th>
-            </tr></thead>
-            <tbody id="live-body"></tbody>
-          </table>
+        <div class="timeline-svg-wrap">
+          <svg class="timeline-svg" id="timeline-svg" viewBox="0 0 880 180" style="height:180px"></svg>
         </div>
-        <div id="live-empty" class="empty" style="display:none">No open positions today.</div>
+        <div class="tl-insight-grid" id="tl-insights"></div>
+        <div id="stale-notice" class="stale-notice" style="margin-top:6px"></div>
       </div>
     </div>
-    <div class="card">
-      <h3>By strategy</h3>
-      <div id="strat-breakdown"><div class="obs-no-pos">Loading…</div></div>
+    <div class="card" id="right-tiles-panel" style="overflow-y:auto;max-height:520px">
+      <h3>Strategies <span id="right-tiles-live-count" style="font-weight:500;font-size:12px;color:#bbb"></span></h3>
+      <div id="right-tiles-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px"></div>
     </div>
   </div>
 
   </div><!-- /portfolio-section -->
 
-  <!-- Strategy tiles 5-col grid -->
-  <div id="strat-tiles-row"></div>
-
-  <!-- Intraday trade timeline -->
-  <div class="timeline-card" id="timeline-section">
-    <h3>Intraday trade timeline — today</h3>
-    <div class="timeline-svg-wrap">
-      <svg class="timeline-svg" id="timeline-svg" viewBox="0 0 880 320" style="height:320px"></svg>
-    </div>
-    <div class="tl-insight-grid" id="tl-insights"></div>
-  </div>
+  <!-- hidden containers kept for JS compatibility -->
+  <div id="strat-tiles-row" style="display:none"></div>
+  <div id="strat-breakdown" style="display:none"></div>
+  <div id="live-wrap" style="display:none"><table><tbody id="live-body"></tbody></table></div>
+  <div id="live-empty" style="display:none"></div>
+  <span id="live-count" style="display:none"></span>
 
   <!-- PVI NIFTY drift profile (observer / owner only) -->
   <div class="drift-panel" id="drift-panel" style="display:none">
@@ -543,40 +534,39 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
   <div id="obs-grid"></div>
   <div id="obs-empty" style="display:none"></div>
 
-  <!-- Trade history (collapsible) -->
+  <!-- Trade history -->
   <div class="card wide" id="trade-hist-card">
-    <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:10px;border-bottom:1px solid var(--hair);cursor:pointer" onclick="toggleTradeHistory()">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:10px;border-bottom:1px solid var(--hair)">
       <div style="display:flex;align-items:center;gap:12px">
-        <span style="font-size:11px;font-weight:800;color:var(--g);text-transform:uppercase;letter-spacing:2px">Trade history</span>
-        <span style="display:flex;gap:6px" onclick="event.stopPropagation()">
-          <button class="tab active" id="hist-tab-closed" style="font-size:10px;padding:4px 12px" onclick="switchHistView('closed')">Closed</button>
-          <button class="tab" id="hist-tab-live" style="font-size:10px;padding:4px 12px" onclick="switchHistView('live')">Live</button>
+        <span style="font-size:11px;font-weight:800;color:var(--g);text-transform:uppercase;letter-spacing:2px">Positions</span>
+        <span style="display:flex;gap:6px">
+          <button class="tab active" id="hist-tab-live" style="font-size:10px;padding:4px 12px" onclick="switchHistView('live')">Live</button>
+          <button class="tab" id="hist-tab-closed" style="font-size:10px;padding:4px 12px" onclick="switchHistView('closed')">Closed</button>
         </span>
       </div>
-      <span id="hist-collapse-arrow" style="font-size:11px;color:var(--g);transition:transform .2s;display:inline-block">▶</span>
     </div>
-    <div id="hist-collapsible-body" style="display:none;margin-top:14px">
-      <div id="hist-closed-section" style="overflow-x:auto">
+    <div id="hist-collapsible-body" style="margin-top:14px">
+      <div id="hist-closed-section" style="display:none;overflow-x:auto">
         <table>
           <thead><tr>
             <th>Date</th><th>Symbol</th><th>Strategy</th>
             <th>Dir</th><th>Entry</th><th>Exit</th>
-            <th>P&L</th><th>Charges</th><th>Net P&L</th><th>Exit Type</th>
+            <th>P&L</th><th>Charges</th><th>Net P&L</th><th>Exit Type</th><th>Capital</th><th>Agent</th>
           </tr></thead>
           <tbody id="hist-body"></tbody>
         </table>
       </div>
-      <div id="hist-live-section" style="display:none;overflow-x:auto">
+      <div id="hist-live-section" style="overflow-x:auto">
         <table>
           <thead><tr>
             <th>Symbol</th><th>Strategy</th><th>Dir</th>
-            <th>Entry</th><th>Unrealized P&L</th><th>Entered</th><th>Actions</th>
+            <th>Entry</th><th>Unrealized P&L</th><th>Capital</th><th>Agent</th><th>Entered</th><th>Actions</th>
           </tr></thead>
           <tbody id="hist-live-body"></tbody>
         </table>
       </div>
       <div id="hist-empty" class="empty" style="display:none">No trades for this view.</div>
-      <div class="pagination" id="hist-pagination">
+      <div class="pagination" id="hist-pagination" style="display:none">
         <button class="btn-page" id="btn-prev" onclick="changePage(-1)" disabled>← Prev</button>
         <span id="page-label">Page 1</span>
         <button class="btn-page" id="btn-next" onclick="changePage(1)" disabled>Next →</button>
@@ -684,7 +674,7 @@ const USER_ROLE = '__USER_ROLE__';
 let _selectedStrategy = '';
 let _selectedPeriod   = 'today';
 let _page             = 1;
-let _histView         = 'closed'; // 'closed' | 'live'
+let _histView         = 'live'; // 'closed' | 'live'
 let _dataSource       = 'total';  // 'total' | 'kite' (today only)
 let _livePositions    = [];       // cache for live view in history
 let _closedTrades     = [];       // cache for timeline re-render on tile click
@@ -1551,8 +1541,10 @@ function switchHistView(view) {
   document.getElementById('hist-live-section').style.display = view === 'live' ? '' : 'none';
   document.getElementById('hist-pagination').style.display = view === 'closed' ? '' : 'none';
   if (view === 'live') renderHistLive();
-  else refreshHistory();
+  else { _page = 1; refreshHistory(); }
 }
+
+function toggleTradeHistory() { /* no-op — always expanded */ }
 
 function renderHistLive() {
   const tbody = document.getElementById('hist-live-body');
@@ -1578,6 +1570,9 @@ function renderHistLive() {
     const meta    = p.metadata || {};
     const isScaled = (meta.nifty_intra_scale != null && meta.nifty_intra_scale !== 1.0) ||
                      (meta.presignal_scale    != null && meta.presignal_scale    !== 1.0);
+    const capTxt  = p.capital_deployed ? fmtK(p.capital_deployed) : '—';
+    const agentRaw = p.agent_approved_by || '';
+    const agentTxt = agentRaw ? `<span class="agent-chip">${agentRaw.replace('pvi_entry_agent_','v').replace(/_agent$/,'')}</span>` : '—';
     const actionBtns = posId
       ? `<span onclick="event.stopPropagation()">` +
         `<button class="sub-act-btn sub-act-exit"   onclick="subPosConfirm(${posId},'exit','${sym}',${qty})">Exit</button>` +
@@ -1590,6 +1585,8 @@ function renderHistLive() {
       <td><span class="badge badge-${dir.toLowerCase()}">${dir}</span></td>
       <td>₹${fmtNum(p.entry_price)}</td>
       <td class="${unrlCls}" style="font-weight:700">${unrlTxt}</td>
+      <td style="color:var(--g)">${capTxt}</td>
+      <td>${agentTxt}</td>
       <td style="color:var(--g)">${entry}</td>
       <td style="white-space:nowrap">${actionBtns}</td>
     </tr>`;
@@ -1635,48 +1632,8 @@ async function refreshLive() {
     }
   }
 
-  const stratFiltered = _selectedStrategy
-    ? filtered.filter(p => p.strategy_id === _selectedStrategy)
-    : filtered;
-
-  document.getElementById('live-count').textContent = stratFiltered.length ? `(${stratFiltered.length})` : '';
-  const tbody = document.getElementById('live-body');
-  const empty = document.getElementById('live-empty');
-
-  if (!stratFiltered.length) {
-    tbody.innerHTML = '';
-    empty.style.display = 'block';
-    return;
-  }
-  empty.style.display = 'none';
-  tbody.innerHTML = stratFiltered.map(p => {
-    const dir     = p.direction || '';
-    const unrl    = p.unrealized_rs;
-    const unrlTxt = unrl != null ? fmtRs(unrl) : '—';
-    const unrlCls = unrl != null ? (unrl >= 0 ? 'green' : 'red') : '';
-    const entry   = p.entry_time ? new Date(p.entry_time).toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit', timeZone:'Asia/Kolkata'}) : '—';
-    const posId   = p.id;
-    const sym     = (p.symbol || '—').replace(/'/g, "\\'");
-    const qty     = p.qty != null ? p.qty : 1;
-    const meta    = p.metadata || {};
-    const isScaled = (meta.nifty_intra_scale != null && meta.nifty_intra_scale !== 1.0) ||
-                     (meta.presignal_scale    != null && meta.presignal_scale    !== 1.0);
-    const actionBtns = posId
-      ? `<span onclick="event.stopPropagation()">` +
-        `<button class="sub-act-btn sub-act-exit"   onclick="subPosConfirm(${posId},'exit','${sym}',${qty})">Exit</button>` +
-        `<button class="sub-act-btn sub-act-double" onclick="subPosConfirm(${posId},'double','${sym}',${qty})">2×</button>` +
-        `</span>`
-      : '—';
-    return `<tr class="row${isScaled ? ' capital-scaled' : ''}" onclick="showTradeDetail(${JSON.stringify(JSON.stringify(p))})">
-      <td><strong>${p.symbol || '—'}</strong></td>
-      <td style="color:var(--g);font-size:12px">${fmtStratName(p.strategy_id)}</td>
-      <td><span class="badge badge-${dir.toLowerCase()}">${dir}</span></td>
-      <td>₹${fmtNum(p.entry_price)}</td>
-      <td class="${unrlCls}" style="font-weight:700">${unrlTxt}</td>
-      <td style="color:var(--g)">${entry}</td>
-      <td style="white-space:nowrap">${actionBtns}</td>
-    </tr>`;
-  }).join('');
+  // Update hist-live view if currently showing live tab
+  if (_histView === 'live') renderHistLive();
 }
 
 async function refreshHistory() {
@@ -1693,8 +1650,8 @@ async function refreshHistory() {
     return;
   }
 
-  document.getElementById('hist-pagination').style.display = '';
   if (_histView === 'live') { renderHistLive(); return; }
+  document.getElementById('hist-pagination').style.display = '';
 
   const qs = new URLSearchParams({ page: _page });
   if (_selectedStrategy) qs.set('strategy', _selectedStrategy);
@@ -1740,7 +1697,13 @@ function renderTrades(trades) {
     const dir   = t.direction || '';
     const ep    = t.entry_price ? '₹' + fmtNum(t.entry_price) : '—';
     const xp    = t.exit_price  ? '₹' + fmtNum(t.exit_price)  : '—';
-    return `<tr class="row" onclick="showTradeDetail(${JSON.stringify(JSON.stringify(t))})">
+    const meta  = t.metadata || {};
+    const isScaled = (meta.nifty_intra_scale != null && meta.nifty_intra_scale !== 1.0) ||
+                     (meta.presignal_scale    != null && meta.presignal_scale    !== 1.0);
+    const capTxt   = t.capital_deployed ? fmtK(t.capital_deployed) : '—';
+    const agentRaw = t.agent_approved_by || '';
+    const agentTxt = agentRaw ? `<span class="agent-chip">${agentRaw.replace('pvi_entry_agent_','v').replace(/_agent$/,'')}</span>` : '—';
+    return `<tr class="row${isScaled ? ' capital-scaled' : ''}" onclick="showTradeDetail(${JSON.stringify(JSON.stringify(t))})">
       <td>${dateCell}</td>
       <td><strong>${t.symbol || '—'}</strong></td>
       <td style="color:var(--g);font-size:12px">${fmtStratName(t.strategy_id)}</td>
@@ -1751,6 +1714,8 @@ function renderTrades(trades) {
       <td style="color:var(--g)">${chg}</td>
       <td class="${netCls}" style="font-weight:700">${net}</td>
       <td style="color:var(--g);font-size:11px">${t.exit_type || t.status || '—'}</td>
+      <td style="color:var(--g)">${capTxt}</td>
+      <td>${agentTxt}</td>
     </tr>`;
   }).join('');
 }
@@ -2054,15 +2019,16 @@ function showTradeDetail(jsonStr) {
     `<div class="modal-row${isSub ? ' modal-sub' : ''}"><span class="k">${k}</span><span>${v}</span></div>`
   ).join('');
 
-  // Show FM trail section for PVI trades only
+  // Show FM trail section for PVI trades — auto-expanded
   const fmSection = document.getElementById('fm-trail-section');
-  if ((t.strategy_id || '').toUpperCase() === 'PVI') {
+  if ((t.strategy_id || '').toUpperCase().startsWith('PVI')) {
     fmSection.style.display = 'block';
-    document.getElementById('fm-trail-body').style.display = 'none';
-    document.getElementById('fm-trail-toggle').textContent = '▶ show';
     document.getElementById('fm-trail-table').style.display = 'none';
     document.getElementById('fm-trail-empty').style.display = 'none';
     document.getElementById('fm-trail-rows').innerHTML = '';
+    // Auto-expand
+    _fmTrailOpen = false;
+    toggleFmTrail();
   } else {
     fmSection.style.display = 'none';
   }
@@ -2175,35 +2141,33 @@ async function subPosExecute() {
   } catch(e) { alert('Request failed'); }
 }
 
-// ── Trade history toggle ──────────────────────────────────────────────────
-function toggleTradeHistory() {
-  const body  = document.getElementById('hist-collapsible-body');
-  const arrow = document.getElementById('hist-collapse-arrow');
-  if (!body) return;
-  const isOpen = body.style.display !== 'none';
-  body.style.display = isOpen ? 'none' : 'block';
-  if (arrow) arrow.style.transform = isOpen ? '' : 'rotate(90deg)';
-  if (!isOpen) refreshHistory();
-}
-
 // ── Strategy tile grid ────────────────────────────────────────────────────
 function renderStratTiles(strats) {
-  const row = document.getElementById('strat-tiles-row');
-  if (!row) return;
+  const grid = document.getElementById('right-tiles-grid');
+  if (!grid) return;
   const activeSt = strats.filter(s => s.mode !== 'disabled');
-  if (!activeSt.length) { row.innerHTML = ''; return; }
+  if (!activeSt.length) { grid.innerHTML = ''; return; }
+
+  // Sort by most live positions, then today P&L
+  const sorted = [...activeSt].sort((a, b) =>
+    (b.open_positions || 0) - (a.open_positions || 0) || (b.today_pnl_rs || 0) - (a.today_pnl_rs || 0)
+  );
+
+  const totalOpen = activeSt.reduce((s, x) => s + (x.open_positions || 0), 0);
+  const cntEl = document.getElementById('right-tiles-live-count');
+  if (cntEl) cntEl.textContent = totalOpen ? `· ${totalOpen} live` : '';
 
   const allActive = _selectedStrategy === '';
-  const allTile = `<div class="st-tile${allActive ? ' active' : ''}" onclick="selectStratTile('', this)">
+  const allTile = `<div class="st-tile${allActive ? ' active' : ''}" onclick="selectStratTile('', this)" style="grid-column:1/-1">
     <div class="st-tile-name">All strategies</div>
     <div class="st-tile-pnl" style="color:var(--k)">Combined</div>
-    <div class="st-tile-meta"><span class="dot dot-all"></span>${activeSt.length} active</div>
+    <div class="st-tile-meta"><span class="dot dot-all"></span>${activeSt.length} active · ${totalOpen} open</div>
     <svg class="st-tile-spark" viewBox="0 0 100 28" preserveAspectRatio="none">
       <line x1="0" y1="14" x2="100" y2="14" stroke="var(--hair)" stroke-width="1.5"/>
     </svg>
   </div>`;
 
-  const stratTiles = activeSt.map(s => {
+  const stratTiles = sorted.map(s => {
     const todayPnl   = s.today_pnl_rs || 0;
     const totalPnl   = s.total_pnl_rs || 0;
     const showPnl    = (s.n_trades_today || 0) > 0 ? todayPnl : totalPnl;
@@ -2211,14 +2175,16 @@ function renderStratTiles(strats) {
     const pnlTxt     = (showPnl >= 0 ? '+' : '') + fmtRs(showPnl);
     const isActive   = _selectedStrategy === s.strategy_id;
     const dotCls     = s.mode === 'live' ? 'dot-live' : 'dot-shadow';
+    const shadowCls  = s.mode === 'shadow' ? ' st-tile-shadow' : '';
     const spark      = buildSparkline(s);
     const todayT     = s.n_trades_today || 0;
+    const openN      = s.open_positions || 0;
     const metaTxt    = todayT > 0
-      ? `${todayT} trade${todayT!==1?'s':''} today · ${s.open_positions||0} open`
+      ? `${todayT} trade${todayT!==1?'s':''} today · ${openN} open`
       : s.n_trades > 0
         ? `${Math.round(s.win_rate*100)}% WR · ${fmtRs(s.avg_trade_rs)} avg`
         : `${s.mode} · no trades`;
-    return `<div class="st-tile${isActive ? ' active' : ''}" data-sid="${s.strategy_id}" onclick="selectStratTile('${s.strategy_id}', this)">
+    return `<div class="st-tile${shadowCls}${isActive ? ' active' : ''}" data-sid="${s.strategy_id}" onclick="selectStratTile('${s.strategy_id}', this)">
       <div class="st-tile-name">${fmtStratName(s.strategy_id)}</div>
       <div class="st-tile-pnl" style="color:${pnlColor}">${pnlTxt}</div>
       <div class="st-tile-meta"><span class="dot ${dotCls}"></span>${metaTxt}</div>
@@ -2226,7 +2192,7 @@ function renderStratTiles(strats) {
     </div>`;
   });
 
-  row.innerHTML = allTile + stratTiles.join('');
+  grid.innerHTML = allTile + stratTiles.join('');
 }
 
 function buildSparkline(s) {
@@ -2263,18 +2229,14 @@ function selectStratTile(stratId, el) {
   _page = 1;
   document.querySelectorAll('.st-tile').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
-  // Sync breakdown list selection
-  document.querySelectorAll('#strat-breakdown .strat-row').forEach(r => r.classList.remove('active'));
-  const matchRow = stratId
-    ? document.querySelector(`#strat-breakdown .strat-row[data-sid="${stratId}"]`)
-    : document.querySelector('#strat-breakdown .strat-row:not([data-sid])');
-  if (matchRow) matchRow.classList.add('active');
+  const tlLabel = document.getElementById('tl-strat-label');
+  if (tlLabel) tlLabel.textContent = stratId ? fmtStratName(stratId) : 'all strategies';
   renderIntradayTimeline(_closedTrades);
-  Promise.all([refreshPnl(), refreshEquity(), refreshLive(), refreshHistory()]);
+  Promise.all([refreshPnl(), refreshEquity(), refreshHistory()]);
 }
 
 // ── Intraday trade timeline ───────────────────────────────────────────────
-const _TL = { left: 52, right: 16, top: 10, niftyH: 120, ganttTop: 150, ganttRowH: 14 };
+const _TL = { left: 52, right: 16, top: 10, niftyH: 145 };
 _TL.width = 880 - _TL.left - _TL.right;
 
 function _tlToX(timeStr) {
@@ -2354,35 +2316,33 @@ async function renderIntradayTimeline(trades) {
   // Axis labels
   const axisTimes = ['09:15','10:00','11:00','12:00','13:00','14:00','15:00','15:30'];
   const axisHtml = axisTimes.map(t =>
-    `<text x="${_tlToX(t)}" y="310" text-anchor="middle" font-size="10" fill="#999">${t}</text>`
+    `<text x="${_tlToX(t)}" y="178" text-anchor="middle" font-size="10" fill="#999">${t}</text>`
   ).join('');
 
-  // Gantt bars + entry dots
-  const todayISTDate = new Date().toLocaleDateString('en-CA', {timeZone:'Asia/Kolkata'}); // YYYY-MM-DD
-  let ganttHtml = '';
-  todayTrades.slice(0, 10).forEach((t, i) => {
+  // Entry dots on NIFTY line — no gantt bars, all trades visible
+  const todayISTDate = new Date().toLocaleDateString('en-CA', {timeZone:'Asia/Kolkata'});
+  let dotsHtml = '';
+  todayTrades.forEach((t, i) => {
     const fmt = dt => new Date(dt).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Kolkata'});
-    const xT  = fmt(t.exit_time);
-    // Clamp entry to 09:15 for overnight trades (entry date != today)
     const entryDate = t.entry_time
       ? new Date(t.entry_time).toLocaleDateString('en-CA', {timeZone:'Asia/Kolkata'})
       : todayISTDate;
     const isOvernight = entryDate !== todayISTDate;
     const eT  = isOvernight ? '09:15' : fmt(t.entry_time);
-    const x1  = _tlToX(eT);
-    const x2  = Math.max(x1 + 4, _tlToX(xT));
-    const gy  = _TL.ganttTop + i * (_TL.ganttRowH + 3);
-    const profit = (t.pnl_rupees || t.net_pnl_rs || 0) >= 0;
+    const cx  = _tlToX(eT);
+    const cy  = _tlNiftyY(_tlNiftyPct(eT, niftyData), minP, maxP);
+    const profit = (t.net_pnl_rs != null ? t.net_pnl_rs : (t.pnl_rupees || 0)) >= 0;
     const col  = profit ? '#16a34a' : '#dc2626';
-    const eNiftyY = _tlNiftyY(_tlNiftyPct(eT, niftyData), minP, maxP);
-    const label = (isOvernight ? '⟳ ' : '') + (t.symbol || '');
-    ganttHtml += `
-      <rect x="${x1}" y="${gy}" width="${x2 - x1}" height="${_TL.ganttRowH}" rx="2"
-        fill="${col}1a" stroke="${col}" stroke-width="1.2" ${isOvernight ? 'stroke-dasharray="4,2"' : ''}/>
-      <text x="${x1 + 4}" y="${gy + 10}" font-size="9" fill="${col}" font-weight="700">${label}</text>
-      <circle cx="${x1}" cy="${eNiftyY}" r="3.5" fill="#F5C518" stroke="#111" stroke-width="1.2"/>
-      <line x1="${x1}" y1="${eNiftyY}" x2="${x1}" y2="${gy}" stroke="#F5C518" stroke-width="1" stroke-dasharray="3,2" opacity="0.6"/>
-    `;
+    const label = (isOvernight ? '⟳' : '') + (t.symbol || '');
+    const pnlTxt = t.net_pnl_rs != null ? (t.net_pnl_rs >= 0 ? '+₹' : '-₹') + Math.abs(Math.round(t.net_pnl_rs)) : '';
+    // Alternate label above/below to reduce overlap
+    const labelY = (i % 2 === 0) ? cy - 9 : cy + 18;
+    const labelAnchor = cx > _TL.left + _TL.width * 0.8 ? 'end' : 'start';
+    dotsHtml += `<g>
+      <title>${label}${pnlTxt ? ' ' + pnlTxt : ''}</title>
+      <circle cx="${cx}" cy="${cy}" r="4" fill="${col}" stroke="var(--w)" stroke-width="1.5" opacity="0.9"/>
+      <text x="${cx}" y="${labelY}" font-size="8" fill="${col}" font-weight="700" text-anchor="${labelAnchor}">${label}</text>
+    </g>`;
   });
 
   // Y-axis pct labels
@@ -2397,11 +2357,9 @@ async function renderIntradayTimeline(trades) {
     <polyline points="${niftyPts}" fill="none" stroke="#111" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
     ${yLabels}
     <text x="${_TL.left + 4}" y="${_TL.top + 12}" font-size="9" font-weight="800" fill="#999" letter-spacing="1">NIFTY 50</text>
-    <line x1="${_TL.left - 10}" y1="140" x2="${_TL.left + _TL.width}" y2="140" stroke="#e8e8e8" stroke-width="1"/>
-    <text x="${_TL.left + 4}" y="152" font-size="9" font-weight="800" fill="#999" letter-spacing="1">TRADES</text>
-    ${ganttHtml}
+    ${dotsHtml}
     ${axisHtml}
-    <line x1="${_TL.left}" y1="300" x2="${_TL.left + _TL.width}" y2="300" stroke="#e8e8e8" stroke-width="1"/>
+    <line x1="${_TL.left}" y1="168" x2="${_TL.left + _TL.width}" y2="168" stroke="#e8e8e8" stroke-width="1"/>
   `;
 
   // Correlation insight strip
