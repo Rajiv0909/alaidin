@@ -89,7 +89,7 @@ header {
 .kpi-s { font-size: 11px; color: var(--g); margin-top: 6px; font-variant-numeric: tabular-nums; }
 
 /* ── Two-pane ── */
-.two { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 22px; }
+.two { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 22px; align-items: start; }
 .two.wide-l { grid-template-columns: 3fr 2fr; }
 @media (max-width: 900px) { .two { grid-template-columns: 1fr; } }
 
@@ -386,12 +386,6 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
 .timeline-card > h3 { font-size: 11px; font-weight: 800; color: var(--g); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--hair); display: block; }
 .timeline-svg-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .timeline-svg { display: block; min-width: 600px; }
-.tl-insight-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
-@media (max-width: 640px) { .tl-insight-grid { grid-template-columns: 1fr; } }
-.tl-insight { border: 1px solid var(--hair); border-radius: var(--radius); padding: 10px 12px; font-size: 12px; }
-.tl-insight-tag { display: inline-block; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; padding: 1px 6px; border-radius: 2px; margin-bottom: 5px; }
-.tl-insight-tag-green { background: rgba(22,163,74,.12); color: var(--pos); }
-.tl-insight-tag-amber { background: rgba(245,197,24,.18); color: #92690a; }
 </style>
 </head>
 <body>
@@ -498,15 +492,14 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
           <span>Intraday timeline — <span id="tl-strat-label" style="font-weight:500;text-transform:none;letter-spacing:normal;color:#bbb">all strategies</span></span>
         </div>
         <div class="timeline-svg-wrap">
-          <svg class="timeline-svg" id="timeline-svg" viewBox="0 0 880 180" style="height:180px"></svg>
+          <svg class="timeline-svg" id="timeline-svg" viewBox="0 0 880 240" style="height:240px"></svg>
         </div>
-        <div class="tl-insight-grid" id="tl-insights"></div>
         <div id="stale-notice" class="stale-notice" style="margin-top:6px"></div>
       </div>
     </div>
-    <div class="card" id="right-tiles-panel" style="overflow-y:auto;display:flex;flex-direction:column">
+    <div class="card" id="right-tiles-panel" style="display:flex;flex-direction:column;align-self:stretch">
       <h3 style="flex-shrink:0">Strategies <span id="right-tiles-live-count" style="font-weight:500;font-size:12px;color:#bbb"></span></h3>
-      <div id="right-tiles-grid" style="display:flex;flex-direction:column;gap:10px"></div>
+      <div id="right-tiles-grid" style="display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;min-height:0"></div>
     </div>
   </div>
 
@@ -2253,7 +2246,7 @@ function selectStratTile(stratId, el) {
 }
 
 // ── Intraday trade timeline ───────────────────────────────────────────────
-const _TL = { left: 52, right: 16, top: 10, niftyH: 145 };
+const _TL = { left: 52, right: 16, top: 12, niftyH: 210 };
 _TL.width = 880 - _TL.left - _TL.right;
 
 function _tlToX(timeStr) {
@@ -2284,8 +2277,7 @@ function _tlNiftyY(pct, minP, maxP) {
 }
 
 async function renderIntradayTimeline(trades) {
-  const svg     = document.getElementById('timeline-svg');
-  const insights = document.getElementById('tl-insights');
+  const svg = document.getElementById('timeline-svg');
   if (!svg) return;
 
   // Fetch real Nifty candles; fall back to truncated static shape
@@ -2317,8 +2309,7 @@ async function renderIntradayTimeline(trades) {
     new Date(t.exit_time).toLocaleDateString('en-CA', {timeZone:'Asia/Kolkata'}) === _tlTodayIST);
 
   if (!todayTrades.length) {
-    svg.innerHTML = `<text x="440" y="164" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="13" fill="#bbb">No closed trades today — timeline will populate during trading hours.</text>`;
-    if (insights) insights.innerHTML = '';
+    svg.innerHTML = `<text x="440" y="120" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="13" fill="#bbb">No closed trades today — timeline will populate during trading hours.</text>`;
     return;
   }
 
@@ -2326,14 +2317,16 @@ async function renderIntradayTimeline(trades) {
   const minP = Math.min(...pcts), maxP = Math.max(...pcts);
   const zeroY = _tlNiftyY(0, minP, maxP);
 
-  // Nifty line
+  // Nifty line — fill anchored at zero line (open = 0%), colored by direction
   const niftyPts = niftyData.map(d => `${_tlToX(d.time)},${_tlNiftyY(d.pct, minP, maxP)}`).join(' ');
-  const fillPts  = `${_TL.left},${_TL.top + _TL.niftyH} ${niftyPts} ${_TL.left + _TL.width},${_TL.top + _TL.niftyH}`;
+  const lastPct  = niftyData[niftyData.length - 1]?.pct || 0;
+  const fillColor = lastPct >= 0 ? 'rgba(22,163,74,0.09)' : 'rgba(220,38,38,0.08)';
+  const fillPts  = `${_TL.left},${zeroY} ${niftyPts} ${_TL.left + _TL.width},${zeroY}`;
 
   // Axis labels
   const axisTimes = ['09:15','10:00','11:00','12:00','13:00','14:00','15:00','15:30'];
   const axisHtml = axisTimes.map(t =>
-    `<text x="${_tlToX(t)}" y="178" text-anchor="middle" font-size="10" fill="#999">${t}</text>`
+    `<text x="${_tlToX(t)}" y="236" text-anchor="middle" font-size="11" fill="#999">${t}</text>`
   ).join('');
 
   // Entry dots on NIFTY line — no gantt bars, all trades visible
@@ -2353,58 +2346,31 @@ async function renderIntradayTimeline(trades) {
     const label = (isOvernight ? '⟳' : '') + (t.symbol || '');
     const pnlTxt = t.net_pnl_rs != null ? (t.net_pnl_rs >= 0 ? '+₹' : '-₹') + Math.abs(Math.round(t.net_pnl_rs)) : '';
     // Alternate label above/below to reduce overlap
-    const labelY = (i % 2 === 0) ? cy - 9 : cy + 18;
+    const labelY = (i % 2 === 0) ? cy - 11 : cy + 20;
     const labelAnchor = cx > _TL.left + _TL.width * 0.8 ? 'end' : 'start';
     dotsHtml += `<g>
       <title>${label}${pnlTxt ? ' ' + pnlTxt : ''}</title>
-      <circle cx="${cx}" cy="${cy}" r="4" fill="${col}" stroke="var(--w)" stroke-width="1.5" opacity="0.9"/>
-      <text x="${cx}" y="${labelY}" font-size="8" fill="${col}" font-weight="700" text-anchor="${labelAnchor}">${label}</text>
+      <circle cx="${cx}" cy="${cy}" r="5" fill="${col}" stroke="var(--w)" stroke-width="1.5" opacity="0.9"/>
+      <text x="${cx}" y="${labelY}" font-size="11" fill="${col}" font-weight="700" text-anchor="${labelAnchor}">${label}</text>
     </g>`;
   });
 
-  // Y-axis pct labels
-  const yLabels = [minP, 0, maxP].map(p => {
+  // Y-axis pct labels (min, zero/open, max)
+  const yLabels = [minP, 0, maxP].filter((v,i,a) => a.indexOf(v) === i).map(p => {
     const y = _tlNiftyY(p, minP, maxP);
-    return `<text x="${_TL.left - 4}" y="${y + 4}" text-anchor="end" font-size="9" fill="#bbb">${p >= 0 ? '+' : ''}${p.toFixed(2)}%</text>`;
+    const isZero = p === 0;
+    return `<text x="${_TL.left - 4}" y="${y + 4}" text-anchor="end" font-size="10" fill="${isZero ? '#999' : '#bbb'}" font-weight="${isZero ? '700' : '400'}">${p >= 0 ? '+' : ''}${p.toFixed(2)}%</text>`;
   }).join('');
 
   svg.innerHTML = `
-    <polygon points="${fillPts}" fill="rgba(220,38,38,0.07)"/>
-    <line x1="${_TL.left}" y1="${zeroY}" x2="${_TL.left + _TL.width}" y2="${zeroY}" stroke="#e8e8e8" stroke-width="1"/>
+    <polygon points="${fillPts}" fill="${fillColor}"/>
+    <line x1="${_TL.left}" y1="${zeroY}" x2="${_TL.left + _TL.width}" y2="${zeroY}" stroke="#ccc" stroke-width="1" stroke-dasharray="4,3"/>
     <polyline points="${niftyPts}" fill="none" stroke="#111" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
     ${yLabels}
-    <text x="${_TL.left + 4}" y="${_TL.top + 12}" font-size="9" font-weight="800" fill="#999" letter-spacing="1">NIFTY 50</text>
+    <text x="${_TL.left + 4}" y="${_TL.top + 13}" font-size="10" font-weight="800" fill="#999" letter-spacing="1">NIFTY 50</text>
     ${dotsHtml}
     ${axisHtml}
-    <line x1="${_TL.left}" y1="168" x2="${_TL.left + _TL.width}" y2="168" stroke="#e8e8e8" stroke-width="1"/>
-  `;
-
-  // Correlation insight strip
-  if (!insights) return;
-  const shortDown = todayTrades.filter(t => {
-    if (t.direction !== 'SHORT') return false;
-    const et = new Date(t.entry_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Kolkata'});
-    return _tlNiftyPct(et, niftyData) < 0;
-  });
-  const longUp = todayTrades.filter(t => {
-    if (t.direction !== 'LONG') return false;
-    const et = new Date(t.entry_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Kolkata'});
-    return _tlNiftyPct(et, niftyData) > 0;
-  });
-  const fmtT = dt => new Date(dt).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Kolkata'});
-  insights.innerHTML = `
-    <div class="tl-insight">
-      <span class="tl-insight-tag tl-insight-tag-green">With the move</span>
-      <div>${shortDown.length
-        ? shortDown.map(t => `<strong>${t.symbol}</strong> SHORT at ${fmtT(t.entry_time)}`).join(', ')
-        : 'No SHORT entries during Nifty-down periods.'}</div>
-    </div>
-    <div class="tl-insight">
-      <span class="tl-insight-tag tl-insight-tag-amber">Against the move</span>
-      <div>${longUp.length
-        ? longUp.map(t => `<strong>${t.symbol}</strong> LONG at ${fmtT(t.entry_time)}`).join(', ')
-        : 'No LONG entries during Nifty-up periods.'}</div>
-    </div>
+    <line x1="${_TL.left}" y1="226" x2="${_TL.left + _TL.width}" y2="226" stroke="#e8e8e8" stroke-width="1"/>
   `;
 }
 
