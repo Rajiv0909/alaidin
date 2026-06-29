@@ -636,17 +636,17 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
 
 <!-- Trade detail modal -->
 <div class="modal-overlay" id="trade-modal" onclick="closeModal(event)">
-  <div class="modal" style="width:560px;max-width:98vw">
+  <div class="modal" style="width:600px;max-width:98vw;max-height:88vh;overflow-y:auto">
     <button class="modal-close" onclick="document.getElementById('trade-modal').classList.remove('show')">×</button>
     <h3 id="modal-title">Trade Detail</h3>
-    <div id="modal-body"></div>
-    <div id="fm-trail-section" style="display:none;margin-top:16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--hair);padding-top:12px;cursor:pointer" onclick="toggleFmTrail()">
-        <span style="font-size:12px;font-weight:700;letter-spacing:.5px;color:var(--g)">FM REASONING TRAIL</span>
+    <!-- FM trail first so it's visible immediately for PVI trades -->
+    <div id="fm-trail-section" style="display:none;margin-bottom:14px;border:1px solid var(--hair);border-radius:6px;padding:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-bottom:6px" onclick="toggleFmTrail()">
+        <span style="font-size:11px;font-weight:800;letter-spacing:1px;color:var(--g);text-transform:uppercase">FM Decisions</span>
         <span id="fm-trail-toggle" style="font-size:11px;color:var(--g)">▶ show</span>
       </div>
-      <div id="fm-trail-body" style="display:none;margin-top:8px;overflow-x:auto">
-        <div id="fm-trail-loading" style="font-size:12px;color:var(--g);padding:8px 0">Loading…</div>
+      <div id="fm-trail-body" style="display:none;overflow-x:auto">
+        <div id="fm-trail-loading" style="font-size:12px;color:var(--g);padding:4px 0">Loading…</div>
         <table id="fm-trail-table" style="display:none;width:100%;border-collapse:collapse;font-size:11px">
           <thead>
             <tr style="color:var(--g);text-align:left;border-bottom:1px solid var(--hair)">
@@ -656,14 +656,15 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
               <th style="padding:4px 6px">Lock%</th>
               <th style="padding:4px 6px">Ceil%</th>
               <th style="padding:4px 6px">Conf</th>
-              <th style="padding:4px 6px;min-width:200px">Rationale</th>
+              <th style="padding:4px 6px;min-width:160px">Rationale</th>
             </tr>
           </thead>
           <tbody id="fm-trail-rows"></tbody>
         </table>
-        <div id="fm-trail-empty" style="display:none;font-size:12px;color:var(--g);padding:8px 0">No FM data for this trade.</div>
+        <div id="fm-trail-empty" style="display:none;font-size:12px;color:var(--g);padding:4px 0">No FM data for this trade.</div>
       </div>
     </div>
+    <div id="modal-body"></div>
   </div>
 </div>
 
@@ -2000,20 +2001,25 @@ function showTradeDetail(jsonStr) {
     rows.push([' SEBI+Stamp',  `₹${((bd.sebi||0)+(bd.stamp||0)).toFixed(2)}`, true]);
     rows.push([' GST',         `₹${(bd.gst||0).toFixed(2)}`,        true]);
   }
+  const isPvi = (t.strategy_id || '').toUpperCase().startsWith('PVI');
   rows.push(
     ['Net P&L',   t.net_pnl_rs   != null ? fmtRs(t.net_pnl_rs) : '—'],
     ['Exit Type', t.exit_type || '—'],
-    ['Zone',      t.zone || '—'],
-    ['Agent',     t.agent_approved_by || '—'],
-    ['Status',    t.status || '—'],
     ['Entry time', t.entry_time ? new Date(t.entry_time).toLocaleString('en-IN') : '—'],
     ['Exit time',  t.exit_time  ? new Date(t.exit_time).toLocaleString('en-IN')  : '—'],
   );
+  if (!isPvi && t.agent_approved_by && t.agent_approved_by !== 'RULE_BASED') {
+    rows.push(['Decision', t.agent_approved_by.replace('pvi_entry_agent_', 'v').replace(/_agent$/, '')]);
+  }
   if (t.metadata) {
-    const ns = t.metadata.nifty_intra_scale;
-    const ps = t.metadata.presignal_scale;
+    const m  = t.metadata;
+    const ns = m.nifty_intra_scale;
+    const ps = m.presignal_scale;
     if (ns != null && ns !== 1.0) rows.push(['NIFTY scale', ns.toFixed(1) + '×']);
     if (ps != null && ps !== 1.0) rows.push(['Presignal scale', ps.toFixed(2) + '×']);
+    if (isPvi && m.regime)        rows.push(['Regime', m.regime]);
+    if (isPvi && m.gap_pct)       rows.push(['Gap', m.gap_pct.toFixed(2) + '%']);
+    if (isPvi && m.vwap_dist)     rows.push(['VWAP dist', m.vwap_dist.toFixed(2) + '%']);
   }
   document.getElementById('modal-body').innerHTML = rows.map(([k, v, isSub]) =>
     `<div class="modal-row${isSub ? ' modal-sub' : ''}"><span class="k">${k}</span><span>${v}</span></div>`
@@ -2021,11 +2027,13 @@ function showTradeDetail(jsonStr) {
 
   // Show FM trail section for PVI trades — auto-expanded
   const fmSection = document.getElementById('fm-trail-section');
-  if ((t.strategy_id || '').toUpperCase().startsWith('PVI')) {
+  if (isPvi) {
     fmSection.style.display = 'block';
+    document.getElementById('fm-trail-body').style.display = 'none';
     document.getElementById('fm-trail-table').style.display = 'none';
     document.getElementById('fm-trail-empty').style.display = 'none';
     document.getElementById('fm-trail-rows').innerHTML = '';
+    document.getElementById('fm-trail-toggle').textContent = '▶ show';
     // Auto-expand
     _fmTrailOpen = false;
     toggleFmTrail();
@@ -2046,7 +2054,12 @@ async function toggleFmTrail() {
 
   const t = _currentTradeForFm;
   if (!t || !t.entry_time) return;
-  const date = t.entry_time.slice(0, 10);
+  // Use IST-correct date: exit_time for closed trades (handles overnight PVI_EOD),
+  // today's IST date for live positions, else entry_time date
+  const toISTDate = dt => new Date(dt).toLocaleDateString('en-CA', {timeZone: 'Asia/Kolkata'});
+  const date = t.exit_time
+    ? toISTDate(t.exit_time)
+    : (t.trade_date || toISTDate(new Date()));
 
   document.getElementById('fm-trail-loading').style.display = 'block';
   document.getElementById('fm-trail-table').style.display   = 'none';
