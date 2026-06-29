@@ -504,9 +504,9 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
         <div id="stale-notice" class="stale-notice" style="margin-top:6px"></div>
       </div>
     </div>
-    <div class="card" id="right-tiles-panel" style="overflow-y:auto;max-height:520px">
+    <div class="card" id="right-tiles-panel" style="overflow-y:auto;display:flex;flex-direction:column">
       <h3>Strategies <span id="right-tiles-live-count" style="font-weight:500;font-size:12px;color:#bbb"></span></h3>
-      <div id="right-tiles-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px"></div>
+      <div id="right-tiles-grid" style="display:flex;flex-direction:column;gap:10px;flex:1"></div>
     </div>
   </div>
 
@@ -2148,17 +2148,20 @@ function renderStratTiles(strats) {
   const activeSt = strats.filter(s => s.mode !== 'disabled');
   if (!activeSt.length) { grid.innerHTML = ''; return; }
 
-  // Sort by most live positions, then today P&L
-  const sorted = [...activeSt].sort((a, b) =>
-    (b.open_positions || 0) - (a.open_positions || 0) || (b.today_pnl_rs || 0) - (a.today_pnl_rs || 0)
-  );
+  // Sort: live before shadow, then by open positions DESC
+  const _modePri = {live: 0, shadow: 1};
+  const sorted = [...activeSt].sort((a, b) => {
+    const mp = (_modePri[a.mode] ?? 2) - (_modePri[b.mode] ?? 2);
+    if (mp !== 0) return mp;
+    return (b.open_positions || 0) - (a.open_positions || 0) || (b.today_pnl_rs || 0) - (a.today_pnl_rs || 0);
+  });
 
   const totalOpen = activeSt.reduce((s, x) => s + (x.open_positions || 0), 0);
   const cntEl = document.getElementById('right-tiles-live-count');
   if (cntEl) cntEl.textContent = totalOpen ? `· ${totalOpen} live` : '';
 
   const allActive = _selectedStrategy === '';
-  const allTile = `<div class="st-tile${allActive ? ' active' : ''}" onclick="selectStratTile('', this)" style="grid-column:1/-1">
+  const allTile = `<div class="st-tile${allActive ? ' active' : ''}" onclick="selectStratTile('', this)">
     <div class="st-tile-name">All strategies</div>
     <div class="st-tile-pnl" style="color:var(--k)">Combined</div>
     <div class="st-tile-meta"><span class="dot dot-all"></span>${activeSt.length} active · ${totalOpen} open</div>
@@ -2232,6 +2235,7 @@ function selectStratTile(stratId, el) {
   const tlLabel = document.getElementById('tl-strat-label');
   if (tlLabel) tlLabel.textContent = stratId ? fmtStratName(stratId) : 'all strategies';
   renderIntradayTimeline(_closedTrades);
+  renderHistLive(); // immediate client-side filter using cached positions
   Promise.all([refreshPnl(), refreshEquity(), refreshHistory()]);
 }
 
