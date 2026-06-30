@@ -387,6 +387,12 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
 .timeline-card > h3 { font-size: 11px; font-weight: 800; color: var(--g); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--hair); display: block; }
 .timeline-svg-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .timeline-svg { display: block; min-width: 600px; }
+#right-tiles-grid { scrollbar-width: none; }
+#right-tiles-grid::-webkit-scrollbar { display: none; }
+#right-tiles-grid:hover { scrollbar-width: thin; scrollbar-color: #ddd transparent; }
+#right-tiles-grid:hover::-webkit-scrollbar { display: block; width: 4px; }
+#right-tiles-grid:hover::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
+#right-tiles-grid:hover::-webkit-scrollbar-track { background: transparent; }
 </style>
 </head>
 <body>
