@@ -89,7 +89,8 @@ header {
 .kpi-s { font-size: 11px; color: var(--g); margin-top: 6px; font-variant-numeric: tabular-nums; }
 
 /* ── Two-pane ── */
-.two { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 22px; align-items: start; }
+.two { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 22px; }
+.scale-badge { font-size:9px; font-weight:800; padding:1px 4px; border-radius:2px; background:rgba(245,158,11,.2); color:#92400e; vertical-align:middle; margin-left:3px; }
 .two.wide-l { grid-template-columns: 3fr 2fr; }
 @media (max-width: 900px) { .two { grid-template-columns: 1fr; } }
 
@@ -497,9 +498,9 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
         <div id="stale-notice" class="stale-notice" style="margin-top:6px"></div>
       </div>
     </div>
-    <div class="card" id="right-tiles-panel" style="display:flex;flex-direction:column;align-self:stretch">
+    <div class="card" id="right-tiles-panel" style="display:flex;flex-direction:column;overflow-y:hidden">
       <h3 style="flex-shrink:0">Strategies <span id="right-tiles-live-count" style="font-weight:500;font-size:12px;color:#bbb"></span></h3>
-      <div id="right-tiles-grid" style="display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;min-height:0"></div>
+      <div id="right-tiles-grid" style="display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;min-height:0;padding-right:2px"></div>
     </div>
   </div>
 
@@ -553,7 +554,7 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
         <table>
           <thead><tr>
             <th>Symbol</th><th>Strategy</th><th>Dir</th>
-            <th>Entry</th><th>Unrealized P&L</th><th>Capital</th><th>Agent</th><th>Entered</th><th>Actions</th>
+            <th>Entry</th><th>Unrealized</th><th>MFE</th><th>Capital</th><th>FM Levels</th><th>Entered</th><th>Actions</th>
           </tr></thead>
           <tbody id="hist-live-body"></tbody>
         </table>
@@ -672,6 +673,8 @@ let _histView         = 'live'; // 'closed' | 'live'
 let _dataSource       = 'total';  // 'total' | 'kite' (today only)
 let _livePositions    = [];       // cache for live view in history
 let _closedTrades     = [];       // cache for timeline re-render on tile click
+let _fmLatest         = {};       // latest FM cycle per symbol {symbol: {lock_pct,ceil_pct,mfe_pct,stance}}
+const _tradeRows      = {};       // data-tdk → trade object (avoids JSON in onclick attrs)
 let _pnlData          = null;
 let _equityChart      = null;
 let _liveTimer        = null;
@@ -680,6 +683,8 @@ let _subscriptions    = [];
 let _currentView      = 'invest';
 const _specLoaded     = {};
 let _peakConcurrentCapital = 0;  // tracks max concurrent capital seen this session for ROC
+
+window.addEventListener('resize', syncSidebarHeight);
 
 // ── Init ──────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -1522,6 +1527,7 @@ async function refreshEquity() {
         interaction: { mode: 'index', intersect: false },
         responsive: true,
         maintainAspectRatio: true,
+        animation: { onComplete: syncSidebarHeight },
       },
     });
   }
@@ -1552,7 +1558,10 @@ function renderHistLive() {
     return;
   }
   empty.style.display = 'none';
-  tbody.innerHTML = positions.map(p => {
+  let seq = Date.now(); // unique key prefix
+  tbody.innerHTML = positions.map((p, i) => {
+    const tdk     = seq + i;
+    _tradeRows[tdk] = p;
     const dir     = p.direction || '';
     const unrl    = p.unrealized_rs;
     const unrlTxt = unrl != null ? fmtRs(unrl) : '—';
@@ -1565,26 +1574,62 @@ function renderHistLive() {
     const isScaled = (meta.nifty_intra_scale != null && meta.nifty_intra_scale !== 1.0) ||
                      (meta.presignal_scale    != null && meta.presignal_scale    !== 1.0);
     const capTxt  = p.capital_deployed ? fmtK(p.capital_deployed) : '—';
-    const agentRaw = p.agent_approved_by || '';
-    const agentTxt = agentRaw ? `<span class="agent-chip">${agentRaw.replace('pvi_entry_agent_','v').replace(/_agent$/,'')}</span>` : '—';
+    const scaleBadge = isScaled ? '<span class="scale-badge">×</span>' : '';
+
+    // FM levels for PVI, agent chip for others
+    const isPvi = (p.strategy_id || '').toUpperCase().startsWith('PVI');
+    let fmHtml = '—', mfeTxt = '—';
+    if (isPvi) {
+      const fm = _fmLatest[p.symbol];
+      if (fm) {
+        const t1Pct = (p.target_price && p.entry_price)
+          ? ((p.target_price - p.entry_price) / p.entry_price * 100).toFixed(2)
+          : null;
+        const parts = [];
+        if (t1Pct)          parts.push(`T1 <b>+${t1Pct}%</b>`);
+        if (fm.lock_pct != null) parts.push(`Lock <b>${fm.lock_pct >= 0 ? '+' : ''}${fm.lock_pct.toFixed(2)}%</b>`);
+        if (fm.ceil_pct != null) parts.push(`Ceil <b>+${fm.ceil_pct.toFixed(2)}%</b>`);
+        fmHtml = parts.length ? `<span style="font-size:10px;color:#555;white-space:nowrap">${parts.join(' · ')}</span>` : '—';
+        if (fm.mfe_pct != null) mfeTxt = `<span style="color:var(--pos);font-size:11px">+${fm.mfe_pct.toFixed(2)}%</span>`;
+      } else {
+        fmHtml = '<span style="font-size:10px;color:#bbb">awaiting FM</span>';
+      }
+    } else {
+      const agentRaw = p.agent_approved_by || '';
+      if (agentRaw && agentRaw !== 'RULE_BASED') {
+        fmHtml = `<span class="agent-chip">${agentRaw.replace('pvi_entry_agent_','v').replace(/_agent$/,'')}</span>`;
+      }
+    }
+
     const actionBtns = posId
-      ? `<span onclick="event.stopPropagation()">` +
-        `<button class="sub-act-btn sub-act-exit"   onclick="subPosConfirm(${posId},'exit','${sym}',${qty})">Exit</button>` +
-        `<button class="sub-act-btn sub-act-double" onclick="subPosConfirm(${posId},'double','${sym}',${qty})">2×</button>` +
-        `</span>`
+      ? `<button class="sub-act-btn sub-act-exit"   onclick="event.stopPropagation();subPosConfirm(${posId},'exit','${sym}',${qty})">Exit</button>` +
+        `<button class="sub-act-btn sub-act-double" onclick="event.stopPropagation();subPosConfirm(${posId},'double','${sym}',${qty})">2×</button>`
       : '—';
-    return `<tr class="row${isScaled ? ' capital-scaled' : ''}" onclick="showTradeDetail(${JSON.stringify(JSON.stringify(p))})">
-      <td><strong>${p.symbol || '—'}</strong></td>
+    return `<tr class="row${isScaled ? ' capital-scaled' : ''}" data-tdk="${tdk}">
+      <td><strong>${p.symbol || '—'}</strong>${scaleBadge}</td>
       <td style="color:var(--g);font-size:12px">${fmtStratName(p.strategy_id)}</td>
       <td><span class="badge badge-${dir.toLowerCase()}">${dir}</span></td>
       <td>₹${fmtNum(p.entry_price)}</td>
       <td class="${unrlCls}" style="font-weight:700">${unrlTxt}</td>
+      <td>${mfeTxt}</td>
       <td style="color:var(--g)">${capTxt}</td>
-      <td>${agentTxt}</td>
+      <td>${fmHtml}</td>
       <td style="color:var(--g)">${entry}</td>
       <td style="white-space:nowrap">${actionBtns}</td>
     </tr>`;
   }).join('');
+  // attach click handlers (avoids JSON-in-HTML-attribute quoting issues)
+  tbody.querySelectorAll('tr.row[data-tdk]').forEach(tr => {
+    tr.addEventListener('click', e => { if (!e.target.closest('button')) showTradeDetail(_tradeRows[+tr.dataset.tdk]); });
+  });
+}
+
+function syncSidebarHeight() {
+  const leftCard  = document.querySelector('.two > .card:first-child');
+  const rightPanel = document.getElementById('right-tiles-panel');
+  if (!leftCard || !rightPanel) return;
+  const h = leftCard.offsetHeight;
+  if (h > 50) rightPanel.style.maxHeight = h + 'px';
 }
 
 async function refreshLive() {
@@ -1592,6 +1637,11 @@ async function refreshLive() {
   const d = await fetchJson('/api/subscriber/live');
   const positions = d.positions || [];
   _livePositions = positions; // cache for hist-live view
+  // Fetch latest FM cycle data for PVI positions
+  try {
+    const fm = await fetchJson('/api/pvi/fm-latest');
+    _fmLatest = fm.data || {};
+  } catch(_) { _fmLatest = {}; }
   const cap = d.capital || {};
 
   const curr = cap.sub_current_allocated;
@@ -1670,7 +1720,10 @@ function renderTrades(trades) {
   }
   empty.style.display = 'none';
 
-  tbody.innerHTML = trades.map(t => {
+  let seq2 = Date.now() + 100000;
+  tbody.innerHTML = trades.map((t, i) => {
+    const tdk2 = seq2 + i;
+    _tradeRows[tdk2] = t;
     const isOvernight = t.is_overnight || (t.strategy_id || '').toUpperCase() === 'EODR';
     const entryDt = t.entry_time ? new Date(t.entry_time) : null;
     const exitDt  = t.exit_time  ? new Date(t.exit_time)  : null;
@@ -1694,12 +1747,14 @@ function renderTrades(trades) {
     const meta  = t.metadata || {};
     const isScaled = (meta.nifty_intra_scale != null && meta.nifty_intra_scale !== 1.0) ||
                      (meta.presignal_scale    != null && meta.presignal_scale    !== 1.0);
-    const capTxt   = t.capital_deployed ? fmtK(t.capital_deployed) : '—';
-    const agentRaw = t.agent_approved_by || '';
-    const agentTxt = agentRaw ? `<span class="agent-chip">${agentRaw.replace('pvi_entry_agent_','v').replace(/_agent$/,'')}</span>` : '—';
-    return `<tr class="row${isScaled ? ' capital-scaled' : ''}" onclick="showTradeDetail(${JSON.stringify(JSON.stringify(t))})">
+    const capTxt    = t.capital_deployed ? fmtK(t.capital_deployed) : '—';
+    const scaleBadge = isScaled ? '<span class="scale-badge">×</span>' : '';
+    const agentRaw  = t.agent_approved_by || '';
+    const agentTxt  = (agentRaw && agentRaw !== 'RULE_BASED')
+      ? `<span class="agent-chip">${agentRaw.replace('pvi_entry_agent_','v').replace(/_agent$/,'')}</span>` : '—';
+    return `<tr class="row${isScaled ? ' capital-scaled' : ''}" data-tdk="${tdk2}">
       <td>${dateCell}</td>
-      <td><strong>${t.symbol || '—'}</strong></td>
+      <td><strong>${t.symbol || '—'}</strong>${scaleBadge}</td>
       <td style="color:var(--g);font-size:12px">${fmtStratName(t.strategy_id)}</td>
       <td><span class="badge badge-${dir.toLowerCase()}">${dir}</span></td>
       <td>${ep}</td>
@@ -1712,6 +1767,9 @@ function renderTrades(trades) {
       <td>${agentTxt}</td>
     </tr>`;
   }).join('');
+  tbody.querySelectorAll('tr.row[data-tdk]').forEach(tr => {
+    tr.addEventListener('click', e => { if (!e.target.closest('button')) showTradeDetail(_tradeRows[+tr.dataset.tdk]); });
+  });
 }
 
 function changePage(delta) {
@@ -1969,8 +2027,9 @@ let _fmTrailLoaded = false;
 let _fmTrailOpen   = false;
 let _currentTradeForFm = null;
 
-function showTradeDetail(jsonStr) {
-  const t = JSON.parse(jsonStr);
+function showTradeDetail(tdkOrObj) {
+  const t = typeof tdkOrObj === 'object' ? tdkOrObj
+          : (typeof tdkOrObj === 'number' ? _tradeRows[tdkOrObj] : JSON.parse(tdkOrObj));
   _currentTradeForFm = t;
   _fmTrailLoaded = false;
   _fmTrailOpen   = false;
@@ -2372,6 +2431,7 @@ async function renderIntradayTimeline(trades) {
     ${axisHtml}
     <line x1="${_TL.left}" y1="226" x2="${_TL.left + _TL.width}" y2="226" stroke="#e8e8e8" stroke-width="1"/>
   `;
+  syncSidebarHeight();
 }
 
 // ── Management panel ──────────────────────────────────────────────────────
