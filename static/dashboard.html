@@ -89,7 +89,7 @@ header {
 .kpi-s { font-size: 11px; color: var(--g); margin-top: 6px; font-variant-numeric: tabular-nums; }
 
 /* ── Two-pane ── */
-.two { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 22px; }
+.two { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 22px; align-items: start; }
 .scale-badge { font-size:9px; font-weight:800; padding:1px 4px; border-radius:2px; background:rgba(245,158,11,.2); color:#92400e; vertical-align:middle; margin-left:3px; }
 .two.wide-l { grid-template-columns: 3fr 2fr; }
 @media (max-width: 900px) { .two { grid-template-columns: 1fr; } }
@@ -498,7 +498,7 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
         <div id="stale-notice" class="stale-notice" style="margin-top:6px"></div>
       </div>
     </div>
-    <div class="card" id="right-tiles-panel" style="display:flex;flex-direction:column;overflow-y:hidden">
+    <div class="card" id="right-tiles-panel" style="display:flex;flex-direction:column;overflow:hidden">
       <h3 style="flex-shrink:0">Strategies <span id="right-tiles-live-count" style="font-weight:500;font-size:12px;color:#bbb"></span></h3>
       <div id="right-tiles-grid" style="display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;min-height:0;padding-right:2px"></div>
     </div>
@@ -1527,9 +1527,9 @@ async function refreshEquity() {
         interaction: { mode: 'index', intersect: false },
         responsive: true,
         maintainAspectRatio: true,
-        animation: { onComplete: syncSidebarHeight },
       },
     });
+    syncSidebarHeight();
   }
 }
 
@@ -1625,11 +1625,14 @@ function renderHistLive() {
 }
 
 function syncSidebarHeight() {
-  const leftCard  = document.querySelector('.two > .card:first-child');
-  const rightPanel = document.getElementById('right-tiles-panel');
-  if (!leftCard || !rightPanel) return;
-  const h = leftCard.offsetHeight;
-  if (h > 50) rightPanel.style.maxHeight = h + 'px';
+  // Must run with align-items:start on .two so leftCard.offsetHeight = natural height (not grid-stretched)
+  requestAnimationFrame(() => {
+    const leftCard   = document.querySelector('.two > .card:first-child');
+    const rightPanel = document.getElementById('right-tiles-panel');
+    if (!leftCard || !rightPanel) return;
+    const h = leftCard.offsetHeight;
+    if (h > 100) rightPanel.style.height = h + 'px';
+  });
 }
 
 async function refreshLive() {
