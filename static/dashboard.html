@@ -325,7 +325,15 @@ input[type=checkbox] { accent-color: var(--y); width: 15px; height: 15px; cursor
 .lvl-inactive { border-color:#e8e8e8;background:#fafafa;color:#bbb; }
 .lvl-warn     { border-color:#f59e0b;background:rgba(245,158,11,.12);color:#92400e; }
 .lvl-active   { border-color:#16a34a;background:rgba(22,163,74,.12);color:#14532d; }
+.lvl-exit     { border-color:#111;background:rgba(0,0,0,.06);color:#111; }
 .lvl-boxes    { display:flex;gap:5px;align-items:flex-start; }
+/* Exit type badges for closed trade history */
+.exit-badge { font-size:9px;font-weight:700;padding:1px 5px;border-radius:2px;display:inline-block;white-space:nowrap; }
+.exit-profit { background:rgba(22,163,74,.1);color:#15803d;border:1px solid #bbf7d0; }
+.exit-loss   { background:rgba(239,68,68,.1);color:#b91c1c;border:1px solid #fecaca; }
+.exit-ceil   { background:rgba(245,158,11,.1);color:#92400e;border:1px solid #fde68a; }
+.exit-eod    { background:#f5f5f5;color:#777;border:1px solid #e5e5e5; }
+.exit-agent  { background:rgba(99,102,241,.1);color:#4f46e5;border:1px solid #c7d2fe; }
 .lvl-rationale { font-size:10px;color:#555;line-height:1.4;max-width:220px;padding-left:8px;border-left:2px solid var(--hair); }
 .lvl-cell     { display:flex;align-items:flex-start;gap:8px; }
 /* Inline FM expansion */
@@ -1239,6 +1247,7 @@ function buildSidebar(subs) {
 
 const STRAT_INFO = {
   'PVI':             ['Price Volume Imbalance', 'Gap-up pullback entry, Volume Profile exits (T1=POC/VAH, T2=VAL)'],
+  'PVI_EOD':         ['PVI Overnight',          'Gap-up short intraday, carry overnight if FM approves'],
   'BLOCK_DEAL_FADE': ['Block Deal Fade',        'Fade large institutional block prints — short the liquidity spike'],
   'BLOCK_DEAL_BOUNCE':['Block Deal Bounce',     'Buy the institutional block print as a support signal'],
   'ORB_SHORT':       ['Opening Range Breakout Short', 'OR breakdown after 09:30, vol 3×, VWAP filter'],
@@ -1644,6 +1653,60 @@ function _lvlBox(label, valTxt, cls) {
   return `<div class="lvl-box ${cls}"><span class="lvl-label">${label}</span><span class="lvl-val">${valTxt}</span></div>`;
 }
 
+function exitBadge(exitType, meta) {
+  const t = (exitType || '').toUpperCase();
+  const isHiMom = meta && (meta.presignal_hi_mom === true || meta.presignal_hi_mom === 'true');
+  if (t === 'T1_PROFIT_CLOSE')    return `<span class="exit-badge exit-profit">T1</span>`;
+  if (t === 'T2')                  return `<span class="exit-badge exit-profit">T2</span>`;
+  if (t === 'PROFIT_LOCK_CLOSE')   return `<span class="exit-badge exit-profit">Lock</span>`;
+  if (['TARGET','TARGET_LEG1','TARGET_VWAP','VWAP_TAKE','VWAP_TRAIL'].includes(t))
+                                   return `<span class="exit-badge exit-profit">Tgt</span>`;
+  if (['FLOW_AGENT_EXIT','AGENT_EXIT','ML_EXIT','EXIT_ML','DS_EXIT_1MIN'].includes(t))
+                                   return `<span class="exit-badge exit-agent">Agent</span>`;
+  if (t === 'TICK_STOP')           return `<span class="exit-badge exit-loss">${isHiMom ? 'HM Stop' : 'Tick'}</span>`;
+  if (['STOP','T0_STOP','STOP_OBS','T1_STOP','T2_STOP','DS_STOP_BREACH',
+       'ADVERSE_TRAIL_BREACH','TRAILING_STOP'].includes(t))
+                                   return `<span class="exit-badge exit-loss">Stop</span>`;
+  if (t === 'LOSS_CEILING_CLOSE')  return `<span class="exit-badge exit-ceil">Ceil</span>`;
+  if (['STRUCTURAL_BREAK','ABSORPTION','SKIP_REDS_GATE'].includes(t))
+                                   return `<span class="exit-badge exit-ceil">${t==='ABSORPTION'?'Absorb':t==='SKIP_REDS_GATE'?'Skip':'Struct'}</span>`;
+  if (['CLOSE','EOD','EOD_STALE','TIMEOUT'].includes(t))
+                                   return `<span class="exit-badge exit-eod">EOD</span>`;
+  if (t === 'KITE_SYNC')           return `<span class="exit-badge exit-eod">Sync</span>`;
+  if (t === 'MANUAL')              return `<span class="exit-badge exit-eod">Manual</span>`;
+  if (t === 'GHOST_CLEANUP')       return `<span class="exit-badge exit-eod">Ghost</span>`;
+  return exitType ? `<span class="exit-badge exit-eod">${exitType}</span>` : '—';
+}
+
+function pviClosedLevels(trade) {
+  const et = (trade.exit_type || '').toUpperCase();
+  const meta = trade.metadata || {};
+  const ep = trade.entry_price || 0;
+  const sp = trade.stop_price;
+  const tp = trade.target_price;
+  const isHiMom = meta.presignal_hi_mom === true || meta.presignal_hi_mom === 'true';
+
+  const t1Abs  = (tp && ep) ? Math.abs((tp - ep) / ep * 100) : null;
+  const stopAbs = (sp && ep) ? (sp - ep) / ep * 100 : null;
+
+  const t1Triggered    = ['T1_PROFIT_CLOSE','T2'].includes(et);
+  const lockTriggered  = et === 'PROFIT_LOCK_CLOSE';
+  const ceilTriggered  = et === 'LOSS_CEILING_CLOSE';
+  const stopTriggered  = ['TICK_STOP','STOP','T0_STOP','STOP_OBS','T1_STOP','T2_STOP',
+                          'DS_STOP_BREACH','ADVERSE_TRAIL_BREACH','TRAILING_STOP'].includes(et);
+
+  const stopLabel = isHiMom ? 'HM Stop' : 'Stop';
+  const t1Val   = t1Abs   != null ? t1Abs.toFixed(2) + '%'  : '—';
+  const stopVal = stopAbs != null ? '+' + stopAbs.toFixed(1) + '%' : '—';
+
+  const t1Box   = _lvlBox('T1',     t1Val,   t1Triggered   ? 'lvl-exit' : 'lvl-inactive');
+  const lockBox = _lvlBox('Lock',   '—',     lockTriggered ? 'lvl-exit' : 'lvl-inactive');
+  const ceilBox = _lvlBox('Ceil',   '—',     ceilTriggered ? 'lvl-exit' : 'lvl-inactive');
+  const stopBox = _lvlBox(stopLabel, stopVal, stopTriggered ? 'lvl-exit' : 'lvl-inactive');
+
+  return `<div class="lvl-boxes">${stopBox}${t1Box}${lockBox}${ceilBox}</div>`;
+}
+
 function renderHistLive() {
   const tbody = document.getElementById('hist-live-body');
   const empty = document.getElementById('hist-empty');
@@ -1674,34 +1737,41 @@ function renderHistLive() {
     const isShadow = (p.metadata?.shadow || (p.strategy_id||'').includes('SHADOW'));
     const rowCls = isShadow ? 'pos-shadow' : 'pos-live';
 
-    const isPvi = (p.strategy_id || '').toUpperCase().startsWith('PVI');
+    const isPvi = p.strategy_id === 'PVI';
     let levelsHtml = '—', mfeTxt = '—';
     if (isPvi) {
+      // Stop box always shown (from trade data, no FM needed)
+      const stopPct = (p.stop_price && p.entry_price)
+        ? (p.stop_price - p.entry_price) / p.entry_price * 100 : null;
+      const isHiMom = meta.presignal_hi_mom === true || meta.presignal_hi_mom === 'true';
+      const stopBox = _lvlBox(isHiMom ? 'HM Stop' : 'Stop',
+        stopPct != null ? '+' + stopPct.toFixed(1) + '%' : '—', 'lvl-inactive');
+
       const fm = _fmLatest[p.symbol];
       if (fm) {
-        // T1 box: green if mfe >= t1 - 0.2%
-        const t1Pct = (p.target_price && p.entry_price)
-          ? (p.target_price - p.entry_price) / p.entry_price * 100
+        // T1 box: green if mfe reached within 0.2% of target (mfe is positive profit %, t1Abs is profit target distance)
+        const t1Abs = (p.target_price && p.entry_price)
+          ? Math.abs((p.target_price - p.entry_price) / p.entry_price * 100)
           : null;
-        const t1Val  = t1Pct != null ? (t1Pct >= 0 ? '+' : '') + t1Pct.toFixed(2) + '%' : '—';
-        const t1Active = t1Pct != null && fm.mfe_pct != null && fm.mfe_pct >= t1Pct - 0.2;
+        const t1Val    = t1Abs != null ? t1Abs.toFixed(2) + '%' : '—';
+        const t1Active = t1Abs != null && fm.mfe_pct != null && fm.mfe_pct >= t1Abs - 0.2;
         const t1Box = _lvlBox('T1', t1Val, t1Active ? 'lvl-active' : 'lvl-inactive');
 
         // Lock box: green if lock_activated
-        const lockVal = fm.lock_pct != null ? (fm.lock_pct >= 0 ? '+' : '') + fm.lock_pct.toFixed(2) + '%' : '—';
+        const lockVal = fm.lock_pct != null ? '+' + fm.lock_pct.toFixed(2) + '%' : '—';
         const lockBox = _lvlBox('Lock', lockVal, fm.lock_activated ? 'lvl-active' : 'lvl-inactive');
 
-        // Ceil box: red=0, amber=1, green=2+
+        // Ceil box: inactive=0, amber=1, green=2+
         const ceilVal = fm.ceil_pct != null ? '+' + fm.ceil_pct.toFixed(2) + '%' : '—';
         const ct = fm.ceiling_touches || 0;
         const ceilCls = ct >= 2 ? 'lvl-active' : ct === 1 ? 'lvl-warn' : 'lvl-inactive';
         const ceilBox = _lvlBox('Ceil', ceilVal, ceilCls);
 
         const rationale = fm.rationale ? `<div class="lvl-rationale">${fm.rationale.slice(0,120)}${fm.rationale.length > 120 ? '…' : ''}</div>` : '';
-        levelsHtml = `<div class="lvl-cell"><div class="lvl-boxes">${t1Box}${lockBox}${ceilBox}</div>${rationale}</div>`;
+        levelsHtml = `<div class="lvl-cell"><div class="lvl-boxes">${stopBox}${t1Box}${lockBox}${ceilBox}</div>${rationale}</div>`;
         if (fm.mfe_pct != null) mfeTxt = `<span style="color:var(--pos);font-size:11px">+${fm.mfe_pct.toFixed(2)}%</span>`;
       } else {
-        levelsHtml = '<span style="font-size:10px;color:#bbb">awaiting FM</span>';
+        levelsHtml = `<div class="lvl-cell"><div class="lvl-boxes">${stopBox}</div><span style="font-size:10px;color:#bbb">awaiting FM</span></div>`;
       }
     } else {
       const agentRaw = p.agent_approved_by || '';
@@ -1748,9 +1818,8 @@ async function toggleLiveFmRow(tr) {
   detRow.dataset.loaded = '1';
 
   const p = _tradeRows[+tdk];
-  const isPvi = (p?.strategy_id || '').toUpperCase().startsWith('PVI');
+  const isPvi = p?.strategy_id === 'PVI';
   if (!isPvi) {
-    // For non-PVI: show trade detail fields
     inner.innerHTML = '<div style="font-size:11px;color:#bbb">No FM trail for this strategy.</div>';
     return;
   }
@@ -1914,6 +1983,10 @@ function renderTrades(trades) {
     const agentRaw  = t.agent_approved_by || '';
     const agentTxt  = (agentRaw && agentRaw !== 'RULE_BASED')
       ? `<span class="agent-chip">${agentRaw.replace('pvi_entry_agent_','v').replace(/_agent$/,'')}</span>` : '—';
+    const isPviClosed = t.strategy_id === 'PVI';
+    const exitCell = isPviClosed
+      ? pviClosedLevels(t)
+      : exitBadge(t.exit_type, meta);
     return `<tr class="row${isScaled ? ' capital-scaled' : ''}" data-tdk="${tdk2}">
       <td>${dateCell}</td>
       <td><strong>${t.symbol || '—'}</strong>${scaleBadge}</td>
@@ -1924,7 +1997,7 @@ function renderTrades(trades) {
       <td>${gross}</td>
       <td style="color:var(--g)">${chg}</td>
       <td class="${netCls}" style="font-weight:700">${net}</td>
-      <td style="color:var(--g);font-size:11px">${t.exit_type || t.status || '—'}</td>
+      <td>${exitCell}</td>
       <td style="color:var(--g)">${capTxt}</td>
       <td>${agentTxt}</td>
     </tr>`;
@@ -2311,7 +2384,7 @@ function showTradeDetail(tdkOrObj) {
     rows.push([' SEBI+Stamp',  `₹${((bd.sebi||0)+(bd.stamp||0)).toFixed(2)}`, true]);
     rows.push([' GST',         `₹${(bd.gst||0).toFixed(2)}`,        true]);
   }
-  const isPvi = (t.strategy_id || '').toUpperCase().startsWith('PVI');
+  const isPvi = t.strategy_id === 'PVI';
   rows.push(
     ['Net P&L',   t.net_pnl_rs   != null ? fmtRs(t.net_pnl_rs) : '—'],
     ['Exit Type', t.exit_type || '—'],
