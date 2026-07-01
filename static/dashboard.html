@@ -748,8 +748,9 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
               <th style="padding:4px 6px">Time</th>
               <th style="padding:4px 6px">Stance</th>
               <th style="padding:4px 6px">MFE%</th>
-              <th style="padding:4px 6px">Lock%</th>
-              <th style="padding:4px 6px">Ceil%</th>
+              <th style="padding:4px 6px">T1</th>
+              <th style="padding:4px 6px">T0</th>
+              <th style="padding:4px 6px">S0</th>
               <th style="padding:4px 6px">Conf</th>
               <th style="padding:4px 6px;min-width:160px">Rationale</th>
             </tr>
@@ -1678,8 +1679,20 @@ function exitBadge(exitType, meta) {
   return exitType ? `<span class="exit-badge exit-eod">${exitType}</span>` : '—';
 }
 
+function _exitBucket(exitType) {
+  const t = (exitType || '').toUpperCase();
+  if (['T1_PROFIT_CLOSE','T2'].includes(t))   return 'T1';
+  if (t === 'PROFIT_LOCK_CLOSE')               return 'T0';
+  if (t === 'LOSS_CEILING_CLOSE')              return 'S0';
+  if (['TICK_STOP','STOP','T0_STOP','STOP_OBS','T1_STOP','T2_STOP',
+       'DS_STOP_BREACH','ADVERSE_TRAIL_BREACH','TRAILING_STOP'].includes(t)) return 'S1';
+  if (t === 'MANUAL')                          return 'MANUAL';
+  if (['CLOSE','EOD','EOD_STALE','TIMEOUT','KITE_SYNC','GHOST_CLEANUP'].includes(t)) return 'EOD';
+  return null;
+}
+
 function pviClosedLevels(trade) {
-  const et = (trade.exit_type || '').toUpperCase();
+  const bucket = _exitBucket(trade.exit_type);
   const meta = trade.metadata || {};
   const ep = trade.entry_price || 0;
   const sp = trade.stop_price;
@@ -1689,22 +1702,16 @@ function pviClosedLevels(trade) {
   const t1Abs  = (tp && ep) ? Math.abs((tp - ep) / ep * 100) : null;
   const stopAbs = (sp && ep) ? (sp - ep) / ep * 100 : null;
 
-  const t1Triggered    = ['T1_PROFIT_CLOSE','T2'].includes(et);
-  const lockTriggered  = et === 'PROFIT_LOCK_CLOSE';
-  const ceilTriggered  = et === 'LOSS_CEILING_CLOSE';
-  const stopTriggered  = ['TICK_STOP','STOP','T0_STOP','STOP_OBS','T1_STOP','T2_STOP',
-                          'DS_STOP_BREACH','ADVERSE_TRAIL_BREACH','TRAILING_STOP'].includes(et);
-
-  const stopLabel = isHiMom ? 'HM Stop' : 'Stop';
   const t1Val   = t1Abs   != null ? t1Abs.toFixed(2) + '%'  : '—';
   const stopVal = stopAbs != null ? '+' + stopAbs.toFixed(1) + '%' : '—';
 
-  const t1Box   = _lvlBox('T1',     t1Val,   t1Triggered   ? 'lvl-exit' : 'lvl-inactive');
-  const lockBox = _lvlBox('Lock',   '—',     lockTriggered ? 'lvl-exit' : 'lvl-inactive');
-  const ceilBox = _lvlBox('Ceil',   '—',     ceilTriggered ? 'lvl-exit' : 'lvl-inactive');
-  const stopBox = _lvlBox(stopLabel, stopVal, stopTriggered ? 'lvl-exit' : 'lvl-inactive');
+  const t1Box     = _lvlBox('T1',                   t1Val,   bucket === 'T1'     ? 'lvl-exit' : 'lvl-inactive');
+  const lockBox   = _lvlBox('T0',                   '—',     bucket === 'T0'     ? 'lvl-exit' : 'lvl-inactive');
+  const ceilBox   = _lvlBox('S0',                   '—',     bucket === 'S0'     ? 'lvl-exit' : 'lvl-inactive');
+  const stopBox   = _lvlBox(isHiMom ? 'HM S1':'S1', stopVal, bucket === 'S1'    ? 'lvl-exit' : 'lvl-inactive');
+  const eodBox    = _lvlBox('EOD',                  '—',     ['EOD','MANUAL'].includes(bucket) ? 'lvl-exit' : 'lvl-inactive');
 
-  return `<div class="lvl-boxes">${stopBox}${t1Box}${lockBox}${ceilBox}</div>`;
+  return `<div class="lvl-boxes">${stopBox}${t1Box}${lockBox}${ceilBox}${eodBox}</div>`;
 }
 
 function renderHistLive() {
@@ -1740,38 +1747,34 @@ function renderHistLive() {
     const isPvi = p.strategy_id === 'PVI';
     let levelsHtml = '—', mfeTxt = '—';
     if (isPvi) {
-      // Stop box always shown (from trade data, no FM needed)
+      // S1 box always shown (hard stop, from trade data)
       const stopPct = (p.stop_price && p.entry_price)
         ? (p.stop_price - p.entry_price) / p.entry_price * 100 : null;
       const isHiMom = meta.presignal_hi_mom === true || meta.presignal_hi_mom === 'true';
-      const stopBox = _lvlBox(isHiMom ? 'HM Stop' : 'Stop',
+      const s1Box = _lvlBox(isHiMom ? 'HM S1' : 'S1',
         stopPct != null ? '+' + stopPct.toFixed(1) + '%' : '—', 'lvl-inactive');
 
       const fm = _fmLatest[p.symbol];
       if (fm) {
-        // T1 box: green if mfe reached within 0.2% of target (mfe is positive profit %, t1Abs is profit target distance)
-        const t1Abs = (p.target_price && p.entry_price)
-          ? Math.abs((p.target_price - p.entry_price) / p.entry_price * 100)
-          : null;
-        const t1Val    = t1Abs != null ? t1Abs.toFixed(2) + '%' : '—';
-        const t1Active = t1Abs != null && fm.mfe_pct != null && fm.mfe_pct >= t1Abs - 0.2;
-        const t1Box = _lvlBox('T1', t1Val, t1Active ? 'lvl-active' : 'lvl-inactive');
+        // T1 box: FM's t1_lock_pct (tick-based take-profit); green when armed
+        const t1Val = fm.t1_pct != null ? fm.t1_pct.toFixed(2) + '%' : '—';
+        const t1Box = _lvlBox('T1', t1Val, fm.t1_pct != null ? 'lvl-active' : 'lvl-inactive');
 
-        // Lock box: green if lock_activated
-        const lockVal = fm.lock_pct != null ? '+' + fm.lock_pct.toFixed(2) + '%' : '—';
-        const lockBox = _lvlBox('Lock', lockVal, fm.lock_activated ? 'lvl-active' : 'lvl-inactive');
+        // T0 box: profit lock; green if lock_activated
+        const t0Val = fm.lock_pct != null ? fm.lock_pct.toFixed(2) + '%' : '—';
+        const t0Box = _lvlBox('T0', t0Val, fm.lock_activated ? 'lvl-active' : 'lvl-inactive');
 
-        // Ceil box: inactive=0, amber=1, green=2+
-        const ceilVal = fm.ceil_pct != null ? '+' + fm.ceil_pct.toFixed(2) + '%' : '—';
+        // S0 box: ceiling; inactive=0 touches, amber=1, green=2+
+        const s0Val = fm.ceil_pct != null ? '+' + fm.ceil_pct.toFixed(2) + '%' : '—';
         const ct = fm.ceiling_touches || 0;
-        const ceilCls = ct >= 2 ? 'lvl-active' : ct === 1 ? 'lvl-warn' : 'lvl-inactive';
-        const ceilBox = _lvlBox('Ceil', ceilVal, ceilCls);
+        const s0Cls = ct >= 2 ? 'lvl-active' : ct === 1 ? 'lvl-warn' : 'lvl-inactive';
+        const s0Box = _lvlBox('S0', s0Val, s0Cls);
 
         const rationale = fm.rationale ? `<div class="lvl-rationale">${fm.rationale.slice(0,120)}${fm.rationale.length > 120 ? '…' : ''}</div>` : '';
-        levelsHtml = `<div class="lvl-cell"><div class="lvl-boxes">${stopBox}${t1Box}${lockBox}${ceilBox}</div>${rationale}</div>`;
+        levelsHtml = `<div class="lvl-cell"><div class="lvl-boxes">${s1Box}${t1Box}${t0Box}${s0Box}</div>${rationale}</div>`;
         if (fm.mfe_pct != null) mfeTxt = `<span style="color:var(--pos);font-size:11px">+${fm.mfe_pct.toFixed(2)}%</span>`;
       } else {
-        levelsHtml = `<div class="lvl-cell"><div class="lvl-boxes">${stopBox}</div><span style="font-size:10px;color:#bbb">awaiting FM</span></div>`;
+        levelsHtml = `<div class="lvl-cell"><div class="lvl-boxes">${s1Box}</div><span style="font-size:10px;color:#bbb">awaiting FM</span></div>`;
       }
     } else {
       const agentRaw = p.agent_approved_by || '';
@@ -1834,20 +1837,65 @@ async function toggleLiveFmRow(tr) {
   }
   const rows = d.trail.map((r, i) => {
     const ct = r.ceiling_touches || 0;
-    const ceilCls = ct >= 2 ? 'color:var(--pos)' : ct === 1 ? 'color:#d97706' : 'color:#bbb';
-    const lockCls = r.lock_activated ? 'color:var(--pos)' : 'color:#bbb';
+    const s0Cls = ct >= 2 ? 'color:var(--pos)' : ct === 1 ? 'color:#d97706' : 'color:#bbb';
+    const t0Cls = r.lock_activated ? 'color:var(--pos)' : 'color:#bbb';
+    const t1Cls = r.t1_pct != null ? 'color:var(--pos);font-weight:700' : 'color:#bbb';
     const isFirst = i === 0;
     return `<tr${isFirst ? ' style="font-weight:700"' : ''}>
       <td>${r.bar_ist}</td>
       <td>${r.stance || '—'}</td>
       <td>${r.mfe_pct != null ? '+' + r.mfe_pct.toFixed(2) + '%' : '—'}</td>
-      <td style="${lockCls}">${r.lock_pct != null ? (r.lock_pct >= 0 ? '+' : '') + r.lock_pct.toFixed(2) + '%' : '—'}</td>
-      <td style="${ceilCls}">${r.ceil_pct != null ? '+' + r.ceil_pct.toFixed(2) + '%' : '—'}${ct ? ` (${ct})` : ''}</td>
-      <td style="max-width:340px;word-break:break-word">${r.rationale || '—'}</td>
+      <td style="${t1Cls}">${r.t1_pct != null ? r.t1_pct.toFixed(2) + '%' : '—'}</td>
+      <td style="${t0Cls}">${r.lock_pct != null ? r.lock_pct.toFixed(2) + '%' : '—'}</td>
+      <td style="${s0Cls}">${r.ceil_pct != null ? '+' + r.ceil_pct.toFixed(2) + '%' : '—'}${ct ? ` (${ct})` : ''}</td>
+      <td style="max-width:280px;word-break:break-word">${r.rationale || '—'}</td>
     </tr>`;
   }).join('');
   inner.innerHTML = `<table class="fm-detail-table">
-    <thead><tr><th>Time</th><th>Stance</th><th>MFE%</th><th>Lock%</th><th>Ceil%</th><th>Rationale</th></tr></thead>
+    <thead><tr><th>Time</th><th>Stance</th><th>MFE%</th><th>T1</th><th>T0</th><th>S0</th><th>Rationale</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+async function toggleClosedFmRow(tr) {
+  const tdk = tr.dataset.tdk;
+  const detRow = document.getElementById(`fmdet-c-${tdk}`);
+  const inner  = document.getElementById(`fmdet-c-inner-${tdk}`);
+  if (!detRow) return;
+  const opening = detRow.style.display === 'none';
+  detRow.style.display = opening ? '' : 'none';
+  tr.style.outline = opening ? '2px solid var(--y)' : '';
+  if (!opening || detRow.dataset.loaded) return;
+  detRow.dataset.loaded = '1';
+
+  const t = _tradeRows[+tdk];
+  const toISTDate = dt => new Date(dt).toLocaleDateString('en-CA', {timeZone:'Asia/Kolkata'});
+  const date = t.exit_time ? toISTDate(t.exit_time) : (t.entry_time ? toISTDate(t.entry_time) : null);
+  if (!date || !t.symbol) { inner.innerHTML = '<div style="font-size:11px;color:#bbb">Date unknown.</div>'; return; }
+
+  inner.innerHTML = '<div style="color:#bbb;font-size:11px">Loading FM trail…</div>';
+  const d = await fetchJson(`/api/pvi/fm-trail?symbol=${encodeURIComponent(t.symbol)}&date=${date}`);
+  if (d.error || !d.trail?.length) {
+    inner.innerHTML = '<div style="font-size:11px;color:#bbb">No FM data for this trade.</div>';
+    return;
+  }
+  const rows = d.trail.map((r, i) => {
+    const ct = r.ceiling_touches || 0;
+    const s0Cls = ct >= 2 ? 'color:var(--pos)' : ct === 1 ? 'color:#d97706' : 'color:#bbb';
+    const t0Cls = r.lock_activated ? 'color:var(--pos)' : 'color:#bbb';
+    const t1Cls = r.t1_pct != null ? 'color:var(--pos);font-weight:700' : 'color:#bbb';
+    return `<tr${i === 0 ? ' style="font-weight:700"' : ''}>
+      <td>${r.bar_ist}</td>
+      <td>${r.stance || '—'}</td>
+      <td>${r.mfe_pct != null ? '+' + r.mfe_pct.toFixed(2) + '%' : '—'}</td>
+      <td style="${t1Cls}">${r.t1_pct != null ? r.t1_pct.toFixed(2) + '%' : '—'}</td>
+      <td style="${t0Cls}">${r.lock_pct != null ? r.lock_pct.toFixed(2) + '%' : '—'}</td>
+      <td style="${s0Cls}">${r.ceil_pct != null ? '+' + r.ceil_pct.toFixed(2) + '%' : '—'}${ct ? ` (${ct})` : ''}</td>
+      <td style="max-width:260px;word-break:break-word">${r.rationale || '—'}</td>
+    </tr>`;
+  }).join('');
+  inner.innerHTML = `<table class="fm-detail-table">
+    <thead><tr><th>Time</th><th>Stance</th><th>MFE%</th><th>T1</th><th>T0</th><th>S0</th><th>Rationale</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
 }
@@ -1952,9 +2000,11 @@ function renderTrades(trades) {
   empty.style.display = 'none';
 
   let seq2 = Date.now() + 100000;
-  tbody.innerHTML = trades.map((t, i) => {
+  const allRows = [];
+  trades.forEach((t, i) => {
     const tdk2 = seq2 + i;
     _tradeRows[tdk2] = t;
+    const isPviClosed = t.strategy_id === 'PVI';
     const isOvernight = t.is_overnight || (t.strategy_id || '').toUpperCase() === 'EODR';
     const entryDt = t.entry_time ? new Date(t.entry_time) : null;
     const exitDt  = t.exit_time  ? new Date(t.exit_time)  : null;
@@ -1983,11 +2033,8 @@ function renderTrades(trades) {
     const agentRaw  = t.agent_approved_by || '';
     const agentTxt  = (agentRaw && agentRaw !== 'RULE_BASED')
       ? `<span class="agent-chip">${agentRaw.replace('pvi_entry_agent_','v').replace(/_agent$/,'')}</span>` : '—';
-    const isPviClosed = t.strategy_id === 'PVI';
-    const exitCell = isPviClosed
-      ? pviClosedLevels(t)
-      : exitBadge(t.exit_type, meta);
-    return `<tr class="row${isScaled ? ' capital-scaled' : ''}" data-tdk="${tdk2}">
+    const exitCell = isPviClosed ? pviClosedLevels(t) : exitBadge(t.exit_type, meta);
+    allRows.push(`<tr class="row${isScaled ? ' capital-scaled' : ''}" data-tdk="${tdk2}">
       <td>${dateCell}</td>
       <td><strong>${t.symbol || '—'}</strong>${scaleBadge}</td>
       <td style="color:var(--g);font-size:12px">${fmtStratName(t.strategy_id)}</td>
@@ -2000,10 +2047,21 @@ function renderTrades(trades) {
       <td>${exitCell}</td>
       <td style="color:var(--g)">${capTxt}</td>
       <td>${agentTxt}</td>
-    </tr>`;
-  }).join('');
+    </tr>`);
+    if (isPviClosed) {
+      allRows.push(`<tr class="fm-detail-row" id="fmdet-c-${tdk2}" style="display:none">
+        <td colspan="12"><div class="fm-detail-inner" id="fmdet-c-inner-${tdk2}"><div style="color:#bbb;font-size:11px">Loading…</div></div></td>
+      </tr>`);
+    }
+  });
+  tbody.innerHTML = allRows.join('');
   tbody.querySelectorAll('tr.row[data-tdk]').forEach(tr => {
-    tr.addEventListener('click', e => { if (!e.target.closest('button')) showTradeDetail(_tradeRows[+tr.dataset.tdk]); });
+    const t = _tradeRows[+tr.dataset.tdk];
+    tr.addEventListener('click', e => {
+      if (e.target.closest('button')) return;
+      if (t && t.strategy_id === 'PVI') toggleClosedFmRow(tr);
+      else showTradeDetail(t);
+    });
   });
 }
 
@@ -2473,6 +2531,7 @@ async function toggleFmTrail() {
         <td style="padding:4px 6px;white-space:nowrap">${r.bar_ist || '—'}</td>
         <td style="padding:4px 6px;white-space:nowrap;font-weight:700;${stanceColor(r.stance)}">${r.stance || '—'}</td>
         <td style="padding:4px 6px;text-align:right">${r.mfe_pct != null ? r.mfe_pct.toFixed(2)+'%' : '—'}</td>
+        <td style="padding:4px 6px;text-align:right;${r.t1_pct!=null?'color:var(--pos);font-weight:700':''}">${r.t1_pct != null ? r.t1_pct.toFixed(2)+'%' : '—'}</td>
         <td style="padding:4px 6px;text-align:right">${r.lock_pct != null ? r.lock_pct.toFixed(2)+'%' : '—'}</td>
         <td style="padding:4px 6px;text-align:right">${r.ceil_pct != null ? r.ceil_pct.toFixed(2)+'%' : '—'}</td>
         <td style="padding:4px 6px;text-align:right">${r.confidence != null ? Math.round(r.confidence) : '—'}</td>
