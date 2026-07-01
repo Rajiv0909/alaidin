@@ -315,9 +315,41 @@ input[type=checkbox] { accent-color: var(--y); width: 15px; height: 15px; cursor
 .admin-agent-file { font-size: 10px; color: #bbb; font-weight: 400; font-family: monospace; margin-left: 4px; }
 .admin-agent-body { padding: 10px 12px; border-top: 1px solid var(--hair); display: none; }
 .admin-agent-body.open { display: block; }
-.agent-prompt-area { width: 100%; min-height: 300px; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 11px; line-height: 1.55; border: 1.5px solid #ddd; border-radius: 3px; padding: 10px 12px; resize: vertical; background: #fafaf8; box-sizing: border-box; color: #222; }
-.agent-save-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.agent-prompt-area { width: 100%; height: calc(100vh - 180px); font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px; line-height: 1.6; border: 1.5px solid #ddd; border-radius: 3px; padding: 12px 14px; resize: none; background: #fafaf8; box-sizing: border-box; color: #222; }
+.agent-save-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-shrink: 0; }
 .agent-save-status { font-size: 11px; color: var(--g); }
+/* Live table level boxes */
+.lvl-box { display:inline-flex;flex-direction:column;align-items:center;padding:2px 7px;border-radius:3px;border:1.5px solid;font-size:9px;font-weight:800;line-height:1.3;cursor:default; }
+.lvl-box .lvl-label { font-size:8px;opacity:.7;text-transform:uppercase;letter-spacing:.5px; }
+.lvl-box .lvl-val   { font-size:11px;font-weight:800; }
+.lvl-inactive { border-color:#e8e8e8;background:#fafafa;color:#bbb; }
+.lvl-warn     { border-color:#f59e0b;background:rgba(245,158,11,.12);color:#92400e; }
+.lvl-active   { border-color:#16a34a;background:rgba(22,163,74,.12);color:#14532d; }
+.lvl-boxes    { display:flex;gap:5px;align-items:flex-start; }
+.lvl-rationale { font-size:10px;color:#555;line-height:1.4;max-width:220px;padding-left:8px;border-left:2px solid var(--hair); }
+.lvl-cell     { display:flex;align-items:flex-start;gap:8px; }
+/* Inline FM expansion */
+tr.fm-detail-row td { padding:0 !important; }
+.fm-detail-inner { padding:10px 16px 14px;background:#f9f9f7;border-top:1px solid var(--hair); }
+.fm-detail-table { width:100%;border-collapse:collapse;font-size:11px; }
+.fm-detail-table th { font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#999;padding:3px 8px;border-bottom:1px solid var(--hair);text-align:left; }
+.fm-detail-table td { padding:4px 8px;border-bottom:1px solid #f0f0ec;vertical-align:top; }
+.fm-detail-table tr:first-child td { background:#fff; }
+/* Row shading for live vs shadow positions */
+tr.pos-live   { background:#fff; }
+tr.pos-shadow { background:#f8f8f6;color:#777; }
+/* Full-screen prompt drawer */
+#prompt-drawer-overlay { position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;display:none; }
+#prompt-drawer-overlay.open { display:block; }
+#prompt-drawer { position:fixed;top:0;right:0;width:70vw;min-width:520px;height:100vh;background:var(--cream);border-left:2px solid var(--k);display:flex;flex-direction:column;z-index:301;transform:translateX(100%);transition:transform .22s ease; }
+#prompt-drawer.open { transform:translateX(0); }
+#prompt-drawer-header { display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1.5px solid var(--hair);flex-shrink:0; }
+#prompt-drawer-title { font-size:14px;font-weight:800;flex:1; }
+#prompt-drawer-file { font-size:10px;color:#bbb;font-family:monospace; }
+#prompt-drawer-body { flex:1;display:flex;flex-direction:column;padding:14px 18px;min-height:0; }
+#prompt-drawer-ta { flex:1;font-family:'SFMono-Regular',Consolas,monospace;font-size:12px;line-height:1.6;border:1.5px solid #ddd;border-radius:3px;padding:12px;resize:none;background:#fafaf8;color:#222;min-height:0; }
+#prompt-drawer-footer { display:flex;align-items:center;gap:12px;padding:12px 18px;border-top:1.5px solid var(--hair);flex-shrink:0; }
+#prompt-drawer-status { font-size:11px;color:var(--g); }
 .badge-mode { font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 2px; text-transform: uppercase; letter-spacing: .5px; }
 .badge-live   { background: rgba(22,163,74,.12); color: var(--pos); border: 1px solid var(--pos); }
 .badge-shadow { background: rgba(245,197,24,.18); color: #b45309; border: 1px solid var(--warn); }
@@ -597,7 +629,7 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
         <table>
           <thead><tr>
             <th>Symbol</th><th>Strategy</th><th>Dir</th>
-            <th>Entry</th><th>Unrealized</th><th>MFE</th><th>Capital</th><th>FM Levels</th><th>Entered</th><th>Actions</th>
+            <th>Entry</th><th>Unrealized</th><th>MFE</th><th>Capital</th><th>Levels &amp; Rationale</th>
           </tr></thead>
           <tbody id="hist-live-body"></tbody>
         </table>
@@ -658,6 +690,24 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
 
 <footer>Alaidin Console · Trading data refreshes every 30s · Market hours 09:15–15:30 IST</footer>
 </div><!-- /app -->
+
+<!-- Agent prompt full-screen drawer -->
+<div id="prompt-drawer-overlay" onclick="closePromptDrawer()"></div>
+<div id="prompt-drawer">
+  <div id="prompt-drawer-header">
+    <button class="modal-close" onclick="closePromptDrawer()">×</button>
+    <span id="prompt-drawer-title">Prompt</span>
+    <span id="prompt-drawer-file"></span>
+  </div>
+  <div id="prompt-drawer-body">
+    <textarea id="prompt-drawer-ta"></textarea>
+  </div>
+  <div id="prompt-drawer-footer">
+    <button class="spec-edit-save" onclick="saveDrawerPrompt()">Save Prompt</button>
+    <span id="prompt-drawer-status"></span>
+    <span style="font-size:10px;color:#bbb;margin-left:auto">Auto-backup on first save each day</span>
+  </div>
+</div>
 
 <!-- Subscriber confirm modal -->
 <div class="confirm-modal-overlay" id="sub-confirm-modal">
@@ -789,7 +839,8 @@ function switchView(view) {
   if (view === 'admin') {
     refreshAdmin();
     refreshObsSmoke();
-    _adminTimer = setInterval(refreshAdmin, 30000);
+    // Only refresh executor status on timer — strategy grid is stable, refreshes on user actions only
+    _adminTimer = setInterval(refreshExecutorStatus, 30000);
   } else {
     refreshAll();
     _liveTimer = setInterval(refreshAll, 30000);
@@ -1589,6 +1640,10 @@ function switchHistView(view) {
 
 function toggleTradeHistory() { /* no-op — always expanded */ }
 
+function _lvlBox(label, valTxt, cls) {
+  return `<div class="lvl-box ${cls}"><span class="lvl-label">${label}</span><span class="lvl-val">${valTxt}</span></div>`;
+}
+
 function renderHistLive() {
   const tbody = document.getElementById('hist-live-body');
   const empty = document.getElementById('hist-empty');
@@ -1601,70 +1656,131 @@ function renderHistLive() {
     return;
   }
   empty.style.display = 'none';
-  let seq = Date.now(); // unique key prefix
-  tbody.innerHTML = positions.map((p, i) => {
-    const tdk     = seq + i;
+  let seq = Date.now();
+  const rows = [];
+  positions.forEach((p, i) => {
+    const tdk = seq + i;
     _tradeRows[tdk] = p;
     const dir     = p.direction || '';
     const unrl    = p.unrealized_rs;
     const unrlTxt = unrl != null ? fmtRs(unrl) : '—';
     const unrlCls = unrl != null ? (unrl >= 0 ? 'green' : 'red') : '';
-    const entry   = p.entry_time ? new Date(p.entry_time).toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit', timeZone:'Asia/Kolkata'}) : '—';
-    const posId   = p.id;
-    const sym     = (p.symbol || '—').replace(/'/g, "\\'");
-    const qty     = p.qty != null ? p.qty : 1;
+    const entryTime = p.entry_time ? new Date(p.entry_time).toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit', timeZone:'Asia/Kolkata'}) : '';
     const meta    = p.metadata || {};
     const isScaled = (meta.nifty_intra_scale != null && meta.nifty_intra_scale !== 1.0) ||
                      (meta.presignal_scale    != null && meta.presignal_scale    !== 1.0);
     const capTxt  = p.capital_deployed ? fmtK(p.capital_deployed) : '—';
     const scaleBadge = isScaled ? '<span class="scale-badge">×</span>' : '';
+    const isShadow = (p.metadata?.shadow || (p.strategy_id||'').includes('SHADOW'));
+    const rowCls = isShadow ? 'pos-shadow' : 'pos-live';
 
-    // FM levels for PVI, agent chip for others
     const isPvi = (p.strategy_id || '').toUpperCase().startsWith('PVI');
-    let fmHtml = '—', mfeTxt = '—';
+    let levelsHtml = '—', mfeTxt = '—';
     if (isPvi) {
       const fm = _fmLatest[p.symbol];
       if (fm) {
+        // T1 box: green if mfe >= t1 - 0.2%
         const t1Pct = (p.target_price && p.entry_price)
-          ? ((p.target_price - p.entry_price) / p.entry_price * 100).toFixed(2)
+          ? (p.target_price - p.entry_price) / p.entry_price * 100
           : null;
-        const parts = [];
-        if (t1Pct)          parts.push(`T1 <b>+${t1Pct}%</b>`);
-        if (fm.lock_pct != null) parts.push(`Lock <b>${fm.lock_pct >= 0 ? '+' : ''}${fm.lock_pct.toFixed(2)}%</b>`);
-        if (fm.ceil_pct != null) parts.push(`Ceil <b>+${fm.ceil_pct.toFixed(2)}%</b>`);
-        fmHtml = parts.length ? `<span style="font-size:10px;color:#555;white-space:nowrap">${parts.join(' · ')}</span>` : '—';
+        const t1Val  = t1Pct != null ? (t1Pct >= 0 ? '+' : '') + t1Pct.toFixed(2) + '%' : '—';
+        const t1Active = t1Pct != null && fm.mfe_pct != null && fm.mfe_pct >= t1Pct - 0.2;
+        const t1Box = _lvlBox('T1', t1Val, t1Active ? 'lvl-active' : 'lvl-inactive');
+
+        // Lock box: green if lock_activated
+        const lockVal = fm.lock_pct != null ? (fm.lock_pct >= 0 ? '+' : '') + fm.lock_pct.toFixed(2) + '%' : '—';
+        const lockBox = _lvlBox('Lock', lockVal, fm.lock_activated ? 'lvl-active' : 'lvl-inactive');
+
+        // Ceil box: red=0, amber=1, green=2+
+        const ceilVal = fm.ceil_pct != null ? '+' + fm.ceil_pct.toFixed(2) + '%' : '—';
+        const ct = fm.ceiling_touches || 0;
+        const ceilCls = ct >= 2 ? 'lvl-active' : ct === 1 ? 'lvl-warn' : 'lvl-inactive';
+        const ceilBox = _lvlBox('Ceil', ceilVal, ceilCls);
+
+        const rationale = fm.rationale ? `<div class="lvl-rationale">${fm.rationale.slice(0,120)}${fm.rationale.length > 120 ? '…' : ''}</div>` : '';
+        levelsHtml = `<div class="lvl-cell"><div class="lvl-boxes">${t1Box}${lockBox}${ceilBox}</div>${rationale}</div>`;
         if (fm.mfe_pct != null) mfeTxt = `<span style="color:var(--pos);font-size:11px">+${fm.mfe_pct.toFixed(2)}%</span>`;
       } else {
-        fmHtml = '<span style="font-size:10px;color:#bbb">awaiting FM</span>';
+        levelsHtml = '<span style="font-size:10px;color:#bbb">awaiting FM</span>';
       }
     } else {
       const agentRaw = p.agent_approved_by || '';
       if (agentRaw && agentRaw !== 'RULE_BASED') {
-        fmHtml = `<span class="agent-chip">${agentRaw.replace('pvi_entry_agent_','v').replace(/_agent$/,'')}</span>`;
+        levelsHtml = `<span class="agent-chip">${agentRaw.replace('pvi_entry_agent_','v').replace(/_agent$/,'')}</span>`;
       }
     }
 
-    const actionBtns = posId
-      ? `<button class="sub-act-btn sub-act-exit"   onclick="event.stopPropagation();subPosConfirm(${posId},'exit','${sym}',${qty})">Exit</button>` +
-        `<button class="sub-act-btn sub-act-double" onclick="event.stopPropagation();subPosConfirm(${posId},'double','${sym}',${qty})">2×</button>`
-      : '—';
-    return `<tr class="row${isScaled ? ' capital-scaled' : ''}" data-tdk="${tdk}">
-      <td><strong>${p.symbol || '—'}</strong>${scaleBadge}</td>
+    rows.push(`<tr class="row ${rowCls}${isScaled ? ' capital-scaled' : ''}" data-tdk="${tdk}" data-sym="${p.symbol}" data-sid="${p.strategy_id}">
+      <td><strong>${p.symbol || '—'}</strong>${scaleBadge}${entryTime ? `<br><span style="font-size:10px;color:#bbb;font-weight:400">${entryTime}</span>` : ''}</td>
       <td style="color:var(--g);font-size:12px">${fmtStratName(p.strategy_id)}</td>
       <td><span class="badge badge-${dir.toLowerCase()}">${dir}</span></td>
       <td>₹${fmtNum(p.entry_price)}</td>
       <td class="${unrlCls}" style="font-weight:700">${unrlTxt}</td>
       <td>${mfeTxt}</td>
       <td style="color:var(--g)">${capTxt}</td>
-      <td>${fmHtml}</td>
-      <td style="color:var(--g)">${entry}</td>
-      <td style="white-space:nowrap">${actionBtns}</td>
+      <td>${levelsHtml}</td>
+    </tr>`);
+    // FM detail expansion row (hidden by default)
+    rows.push(`<tr class="fm-detail-row" id="fmdet-${tdk}" style="display:none">
+      <td colspan="8"><div class="fm-detail-inner" id="fmdet-inner-${tdk}"><div style="color:#bbb;font-size:11px">Loading…</div></div></td>
+    </tr>`);
+  });
+  tbody.innerHTML = rows.join('');
+
+  // Click: expand FM trail inline (not modal)
+  tbody.querySelectorAll('tr.row[data-tdk]').forEach(tr => {
+    tr.addEventListener('click', e => {
+      if (e.target.closest('button')) return;
+      toggleLiveFmRow(tr);
+    });
+  });
+}
+
+async function toggleLiveFmRow(tr) {
+  const tdk     = tr.dataset.tdk;
+  const detRow  = document.getElementById(`fmdet-${tdk}`);
+  const inner   = document.getElementById(`fmdet-inner-${tdk}`);
+  if (!detRow) return;
+  const opening = detRow.style.display === 'none';
+  detRow.style.display = opening ? '' : 'none';
+  tr.style.outline = opening ? '2px solid var(--y)' : '';
+  if (!opening || detRow.dataset.loaded) return;
+  detRow.dataset.loaded = '1';
+
+  const p = _tradeRows[+tdk];
+  const isPvi = (p?.strategy_id || '').toUpperCase().startsWith('PVI');
+  if (!isPvi) {
+    // For non-PVI: show trade detail fields
+    inner.innerHTML = '<div style="font-size:11px;color:#bbb">No FM trail for this strategy.</div>';
+    return;
+  }
+  const toISTDate = dt => new Date(dt).toLocaleDateString('en-CA', {timeZone:'Asia/Kolkata'});
+  const date = p.trade_date || toISTDate(new Date());
+  const sym  = p.symbol;
+  inner.innerHTML = '<div style="color:#bbb;font-size:11px">Loading FM trail…</div>';
+  const d = await fetchJson(`/api/pvi/fm-trail?symbol=${encodeURIComponent(sym)}&date=${date}`);
+  if (d.error || !d.trail?.length) {
+    inner.innerHTML = '<div style="font-size:11px;color:#bbb">No FM data yet.</div>';
+    return;
+  }
+  const rows = d.trail.map((r, i) => {
+    const ct = r.ceiling_touches || 0;
+    const ceilCls = ct >= 2 ? 'color:var(--pos)' : ct === 1 ? 'color:#d97706' : 'color:#bbb';
+    const lockCls = r.lock_activated ? 'color:var(--pos)' : 'color:#bbb';
+    const isFirst = i === 0;
+    return `<tr${isFirst ? ' style="font-weight:700"' : ''}>
+      <td>${r.bar_ist}</td>
+      <td>${r.stance || '—'}</td>
+      <td>${r.mfe_pct != null ? '+' + r.mfe_pct.toFixed(2) + '%' : '—'}</td>
+      <td style="${lockCls}">${r.lock_pct != null ? (r.lock_pct >= 0 ? '+' : '') + r.lock_pct.toFixed(2) + '%' : '—'}</td>
+      <td style="${ceilCls}">${r.ceil_pct != null ? '+' + r.ceil_pct.toFixed(2) + '%' : '—'}${ct ? ` (${ct})` : ''}</td>
+      <td style="max-width:340px;word-break:break-word">${r.rationale || '—'}</td>
     </tr>`;
   }).join('');
-  // attach click handlers (avoids JSON-in-HTML-attribute quoting issues)
-  tbody.querySelectorAll('tr.row[data-tdk]').forEach(tr => {
-    tr.addEventListener('click', e => { if (!e.target.closest('button')) showTradeDetail(_tradeRows[+tr.dataset.tdk]); });
-  });
+  inner.innerHTML = `<table class="fm-detail-table">
+    <thead><tr><th>Time</th><th>Stance</th><th>MFE%</th><th>Lock%</th><th>Ceil%</th><th>Rationale</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
 }
 
 function syncSidebarHeight() {
@@ -2044,42 +2160,49 @@ async function loadAdminAgents(sid) {
   `).join('');
 }
 
+let _drawerFile = null;
+
 async function toggleAdminAgent(sid, agentId, file) {
-  const body = document.getElementById(`agbody-${sid}-${agentId}`);
-  const exp  = document.getElementById(`agexp-${sid}-${agentId}`);
-  if (!body) return;
-  const opening = !body.classList.contains('open');
-  body.classList.toggle('open', opening);
-  exp.classList.toggle('open', opening);
-  if (!opening) return;
-  // Load prompt if not yet loaded
-  if (body.dataset.loaded) return;
-  body.dataset.loaded = '1';
+  // Open the full-screen drawer for this prompt
+  const title = document.getElementById('prompt-drawer-title');
+  const fileEl = document.getElementById('prompt-drawer-file');
+  const ta    = document.getElementById('prompt-drawer-ta');
+  const st    = document.getElementById('prompt-drawer-status');
+  if (!ta) return;
+  title.textContent = `${fmtAdminStratName(sid)} — ${agentId.replace(/_/g,' ')}`;
+  fileEl.textContent = file;
+  ta.value = 'Loading…';
+  ta.disabled = true;
+  st.textContent = '';
+  _drawerFile = file;
+  document.getElementById('prompt-drawer-overlay').classList.add('open');
+  document.getElementById('prompt-drawer').classList.add('open');
   const pd = await fetchJson(`/api/admin/agent-prompt?file=${encodeURIComponent(file)}`);
   if (pd.error) {
-    body.innerHTML = `<div style="color:var(--neg);font-size:11px">Error: ${pd.error}</div>`;
-    return;
+    ta.value = `Error loading prompt: ${pd.error}`;
+  } else {
+    ta.value = pd.content;
+    ta.disabled = false;
+    ta.focus();
   }
-  body.innerHTML = `
-    <textarea class="agent-prompt-area" id="apt-${sid}-${agentId}">${pd.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
-    <div class="agent-save-row">
-      <button class="spec-edit-save" onclick="saveAgentPrompt('${sid}','${agentId}','${file}')">Save Prompt</button>
-      <span class="agent-save-status" id="apst-${sid}-${agentId}"></span>
-      <span style="font-size:10px;color:#bbb;margin-left:auto">Auto-backup created on first save each day</span>
-    </div>
-  `;
 }
 
-async function saveAgentPrompt(sid, agentId, file) {
-  const ta   = document.getElementById(`apt-${sid}-${agentId}`);
-  const st   = document.getElementById(`apst-${sid}-${agentId}`);
-  if (!ta || !st) return;
+function closePromptDrawer() {
+  document.getElementById('prompt-drawer-overlay').classList.remove('open');
+  document.getElementById('prompt-drawer').classList.remove('open');
+  _drawerFile = null;
+}
+
+async function saveDrawerPrompt() {
+  const ta = document.getElementById('prompt-drawer-ta');
+  const st = document.getElementById('prompt-drawer-status');
+  if (!ta || !_drawerFile) return;
   st.textContent = 'Saving…';
   st.style.color = 'var(--g)';
   const d = await fetchJson('/api/admin/agent-prompt', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({file, content: ta.value})
+    body: JSON.stringify({file: _drawerFile, content: ta.value})
   });
   if (d.ok) {
     st.textContent = '✓ Saved';
