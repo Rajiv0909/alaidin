@@ -281,6 +281,43 @@ input[type=checkbox] { accent-color: var(--y); width: 15px; height: 15px; cursor
 .strat-tile-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
 .strat-tile-name { font-size: 15px; font-weight: 800; letter-spacing: -.2px; }
 .strat-tile-badges { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+/* ── Admin strategy rows ───────────────────────────────────────────── */
+.admin-strat-list { display: flex; flex-direction: column; gap: 3px; margin-bottom: 24px; }
+.admin-strat-row { border: 1.5px solid var(--hair); border-radius: var(--radius); background: var(--cream); overflow: hidden; }
+.admin-strat-row.live-row { border-left: 3px solid #16a34a; }
+.admin-strat-row.shadow-row { border-left: 3px solid var(--warn); opacity: .85; }
+.admin-row-hdr { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; user-select: none; }
+.admin-row-hdr:hover { background: #f8f8f5; }
+.admin-expand { font-size: 9px; color: #bbb; transition: transform .18s; flex-shrink: 0; }
+.admin-expand.open { transform: rotate(90deg); color: #666; }
+.admin-row-name { font-size: 13px; font-weight: 800; letter-spacing: -.2px; min-width: 170px; }
+.admin-row-stats { display: flex; gap: 6px; flex: 1; }
+.admin-stat-pill { font-size: 11px; color: var(--g); background: var(--w); border: 1px solid var(--hair); border-radius: 2px; padding: 2px 7px; white-space: nowrap; }
+.admin-stat-pill b { color: var(--k); }
+.admin-row-cmds { display: flex; gap: 4px; flex-shrink: 0; }
+.admin-row-body { border-top: 1.5px solid var(--hair); padding: 14px 16px; display: none; }
+.admin-row-body.open { display: block; }
+/* Horizontal spec form */
+.spec-h-groups { display: flex; flex-direction: column; gap: 6px; }
+.spec-h-group-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--g); }
+.spec-h-fields { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.spec-field-h { display: flex; align-items: center; gap: 5px; }
+.spec-field-h label { font-size: 11px; color: #555; white-space: nowrap; }
+.spec-field-h input[type=number], .spec-field-h input[type=text] { width: 72px; padding: 3px 6px; border: 1.5px solid #ddd; border-radius: 2px; font-size: 12px; font-family: inherit; }
+.spec-field-h input.dirty { border-color: var(--warn); background: #fffbeb; }
+.spec-field-h input[type=checkbox] { width: auto; cursor: pointer; }
+/* Agent prompt rows */
+.admin-agents { margin-top: 14px; border-top: 1px solid var(--hair); padding-top: 10px; }
+.admin-agents-hd { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--g); margin-bottom: 6px; }
+.admin-agent-row { border: 1px solid var(--hair); border-radius: 3px; margin-bottom: 5px; overflow: hidden; }
+.admin-agent-hdr { display: flex; align-items: center; gap: 8px; padding: 7px 12px; cursor: pointer; font-size: 12px; font-weight: 700; }
+.admin-agent-hdr:hover { background: #f4f4f0; }
+.admin-agent-file { font-size: 10px; color: #bbb; font-weight: 400; font-family: monospace; margin-left: 4px; }
+.admin-agent-body { padding: 10px 12px; border-top: 1px solid var(--hair); display: none; }
+.admin-agent-body.open { display: block; }
+.agent-prompt-area { width: 100%; min-height: 300px; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 11px; line-height: 1.55; border: 1.5px solid #ddd; border-radius: 3px; padding: 10px 12px; resize: vertical; background: #fafaf8; box-sizing: border-box; color: #222; }
+.agent-save-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.agent-save-status { font-size: 11px; color: var(--g); }
 .badge-mode { font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 2px; text-transform: uppercase; letter-spacing: .5px; }
 .badge-live   { background: rgba(22,163,74,.12); color: var(--pos); border: 1px solid var(--pos); }
 .badge-shadow { background: rgba(245,197,24,.18); color: #b45309; border: 1px solid var(--warn); }
@@ -1855,59 +1892,203 @@ async function refreshAdminStrategies() {
   const strats = d.strategies || [];
   if (!strats.length) { grid.innerHTML = '<div class="empty">No strategies configured.</div>'; return; }
 
+  // Sort: live first by (open*10 + trades) desc, then shadow same
+  strats.sort((a, b) => {
+    const ap = a.mode === 'live' ? 0 : 1, bp = b.mode === 'live' ? 0 : 1;
+    if (ap !== bp) return ap - bp;
+    return ((b.open_positions||0)*10 + (b.n_trades_today||0)) - ((a.open_positions||0)*10 + (a.n_trades_today||0));
+  });
+
+  grid.className = 'admin-strat-list';
   grid.innerHTML = strats.map(s => {
-    const name = fmtAdminStratName(s.strategy_id);
-    const modeBadge = s.mode === 'live'
-      ? `<span class="badge-mode badge-live">● Live</span>`
-      : `<span class="badge-mode badge-shadow">◑ Shadow</span>`;
-    const entryBadge = !s.entry_enabled
-      ? `<span class="badge-mode badge-paused">Paused</span>`
+    const sid  = s.strategy_id;
+    const name = fmtAdminStratName(sid);
+    const isLive = s.mode === 'live';
+    const modeBadge = isLive
+      ? `<span class="badge-mode badge-live" style="font-size:10px">● Live</span>`
+      : `<span class="badge-mode badge-shadow" style="font-size:10px">◑ Shadow</span>`;
+    const pausedBadge = !s.entry_enabled
+      ? `<span class="badge-mode badge-paused" style="font-size:10px">Paused</span>` : '';
+
+    const pnl    = s.today_pnl_rs || 0;
+    const pnlTxt = (pnl >= 0 ? '+' : '') + '₹' + Math.abs(pnl).toLocaleString('en-IN', {maximumFractionDigits:0});
+    const pnlCol = pnl >= 0 ? 'color:var(--pos)' : 'color:var(--neg)';
+    const funnel = s.funnel;
+    const funnelPills = funnel
+      ? `<span class="admin-stat-pill">📡 <b>${funnel.candidates||0}</b></span>
+         <span class="admin-stat-pill">✓ <b>${funnel.evaluated||0}</b></span>
+         <span class="admin-stat-pill">↗ <b>${funnel.signals||0}</b></span>`
       : '';
 
-    const todayPnl = s.today_pnl_rs;
-    const pnlCls   = todayPnl >= 0 ? 'green' : 'red';
-    const pnlTxt   = (todayPnl >= 0 ? '+' : '') + '₹' + Math.abs(todayPnl).toLocaleString('en-IN', {maximumFractionDigits:0});
+    const pD = !s.entry_enabled ? 'disabled' : '';
+    const rD =  s.entry_enabled ? 'disabled' : '';
+    const aD =  s.live_enabled  ? 'disabled' : '';
+    const dD = !s.live_enabled  ? 'disabled' : '';
 
-    const funnel = s.funnel;
-    const funnelHtml = funnel
-      ? `<div class="strat-tile-funnel">
-          <span>📡 ${funnel.candidates || 0} prints</span>
-          <span>✓ ${funnel.evaluated || 0} evaluated</span>
-          <span>↗ ${funnel.signals || 0} signals</span>
-        </div>`
-      : `<div class="strat-tile-funnel"><span style="color:#bbb">Funnel telemetry not yet available for this strategy</span></div>`;
-
-    const pauseDisabled  = !s.entry_enabled ? 'disabled' : '';
-    const resumeDisabled = s.entry_enabled  ? 'disabled' : '';
-    const armDisabled    = s.live_enabled   ? 'disabled' : '';
-    const disarmDisabled = !s.live_enabled  ? 'disabled' : '';
-
-    return `<div class="strat-tile" id="tile-${s.strategy_id}">
-      <div class="strat-tile-head">
-        <div class="strat-tile-name">${name}</div>
-        <div class="strat-tile-badges">${modeBadge}${entryBadge}</div>
+    return `<div class="admin-strat-row ${isLive ? 'live-row' : 'shadow-row'}" id="arow-${sid}">
+      <div class="admin-row-hdr" onclick="toggleAdminRow('${sid}')">
+        <span class="admin-expand" id="aexp-${sid}">▶</span>
+        <span class="admin-row-name">${name}</span>
+        ${modeBadge}${pausedBadge}
+        <div class="admin-row-stats">
+          <span class="admin-stat-pill" style="${pnlCol}"><b>${pnlTxt}</b></span>
+          <span class="admin-stat-pill"><b>${s.n_trades_today||0}</b> trades</span>
+          <span class="admin-stat-pill"><b>${s.open_positions||0}</b> open</span>
+          ${funnelPills}
+        </div>
+        <div class="admin-row-cmds" onclick="event.stopPropagation()">
+          <button class="cmd-btn cmd-pause"  ${pD} onclick="adminCmd('${sid}','pause')">Pause</button>
+          <button class="cmd-btn cmd-resume" ${rD} onclick="adminCmd('${sid}','resume')">Resume</button>
+          <button class="cmd-btn cmd-arm"    ${aD} onclick="adminCmd('${sid}','arm')">Arm</button>
+          <button class="cmd-btn cmd-disarm" ${dD} onclick="adminCmd('${sid}','disarm')">Disarm</button>
+        </div>
       </div>
-      <div class="strat-tile-stats">
-        <div class="strat-tile-stat"><div class="sv ${pnlCls}">${pnlTxt}</div><div class="sl">Today P&L</div></div>
-        <div class="strat-tile-stat"><div class="sv">${s.n_trades_today || s.open_positions || '—'}</div><div class="sl">Today Trades</div></div>
-        <div class="strat-tile-stat"><div class="sv">${s.open_positions}</div><div class="sl">Open</div></div>
-      </div>
-      ${funnelHtml}
-      <div class="strat-tile-cmds">
-        <button class="cmd-btn cmd-pause"  ${pauseDisabled}  onclick="adminCmd('${s.strategy_id}','pause')">Pause</button>
-        <button class="cmd-btn cmd-resume" ${resumeDisabled} onclick="adminCmd('${s.strategy_id}','resume')">Resume</button>
-        <button class="cmd-btn cmd-arm"    ${armDisabled}    onclick="adminCmd('${s.strategy_id}','arm')">Arm Live</button>
-        <button class="cmd-btn cmd-disarm" ${disarmDisabled} onclick="adminCmd('${s.strategy_id}','disarm')">Disarm</button>
-        <button class="cmd-btn" style="background:none;border-color:#ddd;color:var(--g)" onclick="toggleSpec('${s.strategy_id}')">Spec ▾</button>
-      </div>
-      <div class="strat-spec-panel" id="spec-${s.strategy_id}">
-        <div class="spec-desc">${s.description || '—'}</div>
-        <div class="spec-edit-form" id="spec-form-${s.strategy_id}">
-          <div style="color:var(--g);font-size:11px;font-style:italic">Loading editable params…</div>
+      <div class="admin-row-body" id="abody-${sid}">
+        <div style="color:var(--g);font-size:11px;margin-bottom:8px">${s.description || ''}</div>
+        <div class="spec-h-groups" id="spec-form-${sid}">
+          <div style="color:#bbb;font-size:11px;font-style:italic">Loading params…</div>
+        </div>
+        <div class="admin-agents" id="agents-${sid}">
+          <div class="admin-agents-hd">Agents &amp; Prompts</div>
+          <div class="admin-agent-list-body" id="agentlist-${sid}">
+            <div style="color:#bbb;font-size:11px">Loading…</div>
+          </div>
         </div>
       </div>
     </div>`;
   }).join('');
+}
+
+async function toggleAdminRow(sid) {
+  const body = document.getElementById(`abody-${sid}`);
+  const exp  = document.getElementById(`aexp-${sid}`);
+  if (!body) return;
+  const opening = !body.classList.contains('open');
+  body.classList.toggle('open', opening);
+  exp.classList.toggle('open', opening);
+  if (!opening) return;
+  if (!_specLoaded[sid]) {
+    _specLoaded[sid] = true;
+    await loadSpecFormH(sid);
+    await loadAdminAgents(sid);
+  }
+}
+
+async function loadSpecFormH(sid) {
+  const container = document.getElementById(`spec-form-${sid}`);
+  if (!container) return;
+  const d = await fetchJson(`/api/admin/strategy/${sid}/spec-params`);
+  if (d.error || !d.params || !d.params.length) {
+    container.innerHTML = d.error === 'not_found' ? '' :
+      `<div style="color:var(--g);font-size:11px">No editable params for ${sid}.</div>`;
+    return;
+  }
+  const groups = {};
+  d.params.forEach(p => { (groups[p.group] = groups[p.group] || []).push(p); });
+  let html = '';
+  Object.entries(groups).forEach(([grp, params]) => {
+    html += `<div class="spec-h-group-label">${grp}</div><div class="spec-h-fields">`;
+    params.forEach(p => {
+      if (p.type === 'bool') {
+        html += `<div class="spec-field-h">
+          <input type="checkbox" id="spf-${sid}-${p.key}" data-key="${p.key}" data-type="bool"
+            ${p.value ? 'checked' : ''} onchange="markDirty(this)">
+          <label for="spf-${sid}-${p.key}">${p.label}</label>
+        </div>`;
+      } else if (p.type === 'str') {
+        html += `<div class="spec-field-h">
+          <label for="spf-${sid}-${p.key}">${p.label}</label>
+          <input type="text" id="spf-${sid}-${p.key}" data-key="${p.key}" data-type="str"
+            value="${p.value != null ? p.value : ''}" style="width:120px" oninput="markDirty(this)">
+        </div>`;
+      } else {
+        const step = p.type === 'int' ? '1' : '0.01';
+        const minA = p.min != null ? `min="${p.min}"` : '';
+        const maxA = p.max != null ? `max="${p.max}"` : '';
+        html += `<div class="spec-field-h">
+          <label for="spf-${sid}-${p.key}">${p.label}</label>
+          <input type="number" id="spf-${sid}-${p.key}" data-key="${p.key}" data-type="${p.type}"
+            value="${p.value != null ? p.value : ''}" step="${step}" ${minA} ${maxA} oninput="markDirty(this)">
+        </div>`;
+      }
+    });
+    html += `</div>`;
+  });
+  html += `<div style="margin-top:10px;display:flex;align-items:center;gap:10px">
+    <button class="spec-edit-save" id="spec-save-${sid}" onclick="saveSpecParams('${sid}')" disabled>Save Params</button>
+    <div class="spec-edit-status" id="spec-status-${sid}"></div>
+  </div>`;
+  container.innerHTML = html;
+}
+
+async function loadAdminAgents(sid) {
+  const listEl = document.getElementById(`agentlist-${sid}`);
+  if (!listEl) return;
+  const d = await fetchJson(`/api/admin/strategy/${sid}/agents`);
+  const agents = d.agents || [];
+  if (!agents.length) {
+    listEl.innerHTML = '<div style="color:#bbb;font-size:11px">No agent prompts configured for this strategy.</div>';
+    return;
+  }
+  listEl.innerHTML = agents.map(a => `
+    <div class="admin-agent-row" id="agrow-${sid}-${a.id}">
+      <div class="admin-agent-hdr" onclick="toggleAdminAgent('${sid}','${a.id}','${a.file}')">
+        <span class="admin-expand" id="agexp-${sid}-${a.id}">▶</span>
+        <span>${a.label}</span>
+        <span class="admin-agent-file">${a.file}</span>
+      </div>
+      <div class="admin-agent-body" id="agbody-${sid}-${a.id}">
+        <div style="color:#bbb;font-size:11px">Loading prompt…</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function toggleAdminAgent(sid, agentId, file) {
+  const body = document.getElementById(`agbody-${sid}-${agentId}`);
+  const exp  = document.getElementById(`agexp-${sid}-${agentId}`);
+  if (!body) return;
+  const opening = !body.classList.contains('open');
+  body.classList.toggle('open', opening);
+  exp.classList.toggle('open', opening);
+  if (!opening) return;
+  // Load prompt if not yet loaded
+  if (body.dataset.loaded) return;
+  body.dataset.loaded = '1';
+  const pd = await fetchJson(`/api/admin/agent-prompt?file=${encodeURIComponent(file)}`);
+  if (pd.error) {
+    body.innerHTML = `<div style="color:var(--neg);font-size:11px">Error: ${pd.error}</div>`;
+    return;
+  }
+  body.innerHTML = `
+    <textarea class="agent-prompt-area" id="apt-${sid}-${agentId}">${pd.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
+    <div class="agent-save-row">
+      <button class="spec-edit-save" onclick="saveAgentPrompt('${sid}','${agentId}','${file}')">Save Prompt</button>
+      <span class="agent-save-status" id="apst-${sid}-${agentId}"></span>
+      <span style="font-size:10px;color:#bbb;margin-left:auto">Auto-backup created on first save each day</span>
+    </div>
+  `;
+}
+
+async function saveAgentPrompt(sid, agentId, file) {
+  const ta   = document.getElementById(`apt-${sid}-${agentId}`);
+  const st   = document.getElementById(`apst-${sid}-${agentId}`);
+  if (!ta || !st) return;
+  st.textContent = 'Saving…';
+  st.style.color = 'var(--g)';
+  const d = await fetchJson('/api/admin/agent-prompt', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({file, content: ta.value})
+  });
+  if (d.ok) {
+    st.textContent = '✓ Saved';
+    st.style.color = 'var(--pos)';
+    setTimeout(() => { st.textContent = ''; }, 3000);
+  } else {
+    st.textContent = 'Error: ' + (d.error || 'unknown');
+    st.style.color = 'var(--neg)';
+  }
 }
 
 async function adminCmd(sid, cmd) {
@@ -1928,62 +2109,7 @@ async function posAction(tradeId, action, symbol, ev) {
   await refreshAdminStrategies();
 }
 
-async function toggleSpec(sid) {
-  const panel = document.getElementById(`spec-${sid}`);
-  if (!panel) return;
-  panel.classList.toggle('open');
-  if (!panel.classList.contains('open')) return;
-  if (_specLoaded[sid]) return;
-  _specLoaded[sid] = true;
-  await loadSpecForm(sid);
-}
-
-async function loadSpecForm(sid) {
-  const container = document.getElementById(`spec-form-${sid}`);
-  if (!container) return;
-  const d = await fetchJson(`/api/admin/strategy/${sid}/spec-params`);
-  if (d.error || !d.params || !d.params.length) {
-    container.innerHTML = d.error === 'not_found'
-      ? ''
-      : `<div style="color:var(--g);font-size:11px">No editable params defined for ${sid}.</div>`;
-    return;
-  }
-
-  const groups = {};
-  d.params.forEach(p => { (groups[p.group] = groups[p.group] || []).push(p); });
-
-  let html = '';
-  Object.entries(groups).forEach(([grp, params]) => {
-    html += `<div class="spec-group-label">${grp}</div>`;
-    params.forEach(p => {
-      if (p.type === 'bool') {
-        html += `<div class="spec-field">
-          <label>${p.label}</label>
-          <input type="checkbox" id="spf-${sid}-${p.key}" data-key="${p.key}" data-type="bool"
-            ${p.value ? 'checked' : ''} onchange="markDirty(this)">
-        </div>`;
-      } else if (p.type === 'str') {
-        html += `<div class="spec-field">
-          <label>${p.label}</label>
-          <input type="text" id="spf-${sid}-${p.key}" data-key="${p.key}" data-type="str"
-            value="${p.value != null ? p.value : ''}" oninput="markDirty(this)">
-        </div>`;
-      } else {
-        const step = p.type === 'int' ? '1' : '0.01';
-        const minA = p.min != null ? `min="${p.min}"` : '';
-        const maxA = p.max != null ? `max="${p.max}"` : '';
-        html += `<div class="spec-field">
-          <label>${p.label}</label>
-          <input type="number" id="spf-${sid}-${p.key}" data-key="${p.key}" data-type="${p.type}"
-            value="${p.value != null ? p.value : ''}" step="${step}" ${minA} ${maxA} oninput="markDirty(this)">
-        </div>`;
-      }
-    });
-  });
-  html += `<button class="spec-edit-save" id="spec-save-${sid}" onclick="saveSpecParams('${sid}')" disabled>Save</button>
-  <div class="spec-edit-status" id="spec-status-${sid}"></div>`;
-  container.innerHTML = html;
-}
+// toggleSpec / loadSpecForm replaced by toggleAdminRow / loadSpecFormH above
 
 function markDirty(el) {
   el.classList.add('dirty');
