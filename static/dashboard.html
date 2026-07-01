@@ -346,6 +346,8 @@ tr.fm-detail-row td { padding:0 !important; }
 /* Row shading for live vs shadow positions */
 tr.pos-live   { background:#fff; }
 tr.pos-shadow { background:#f8f8f6;color:#777; }
+tr.pos-eod    { background:rgba(245,158,11,.05); }
+tr.pos-eod:hover { background:rgba(245,158,11,.11) !important; }
 /* Full-screen prompt drawer */
 #prompt-drawer-overlay { position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;display:none; }
 #prompt-drawer-overlay.open { display:block; }
@@ -1695,23 +1697,36 @@ function pviClosedLevels(trade) {
   const bucket = _exitBucket(trade.exit_type);
   const meta = trade.metadata || {};
   const ep = trade.entry_price || 0;
+  const xp = trade.exit_price;
   const sp = trade.stop_price;
   const tp = trade.target_price;
   const isHiMom = meta.presignal_hi_mom === true || meta.presignal_hi_mom === 'true';
 
-  const t1Abs  = (tp && ep) ? Math.abs((tp - ep) / ep * 100) : null;
-  const stopAbs = (sp && ep) ? (sp - ep) / ep * 100 : null;
+  // Actual pnl% at exit (PVI = SHORT: entry > exit = profit)
+  const actualPct = (ep && xp) ? (ep - xp) / ep * 100 : (trade.pnl_pct ? parseFloat(trade.pnl_pct) : null);
+  // Initial VP target distance (reference only, may differ from FM's dynamic T1)
+  const t1InitAbs = (tp && ep) ? Math.abs((tp - ep) / ep * 100) : null;
+  const stopAbs   = (sp && ep) ? (sp - ep) / ep * 100 : null;
 
-  const t1Val   = t1Abs   != null ? t1Abs.toFixed(2) + '%'  : '—';
-  const stopVal = stopAbs != null ? '+' + stopAbs.toFixed(1) + '%' : '—';
+  // Triggered box shows actual pnl%; non-triggered profit boxes show initial ref
+  const t1Val  = bucket === 'T1' && actualPct != null
+    ? (actualPct >= 0 ? '+' : '') + actualPct.toFixed(2) + '%'
+    : (t1InitAbs != null ? t1InitAbs.toFixed(2) + '%' : '—');
+  const t0Val  = bucket === 'T0' && actualPct != null
+    ? (actualPct >= 0 ? '+' : '') + actualPct.toFixed(2) + '%' : '—';
+  const s0Val  = bucket === 'S0' && actualPct != null
+    ? actualPct.toFixed(2) + '%' : '—';
+  const s1Val  = bucket === 'S1' && actualPct != null
+    ? actualPct.toFixed(2) + '%'
+    : (stopAbs != null ? '+' + stopAbs.toFixed(1) + '%' : '—');
 
-  const t1Box     = _lvlBox('T1',                   t1Val,   bucket === 'T1'     ? 'lvl-exit' : 'lvl-inactive');
-  const lockBox   = _lvlBox('T0',                   '—',     bucket === 'T0'     ? 'lvl-exit' : 'lvl-inactive');
-  const ceilBox   = _lvlBox('S0',                   '—',     bucket === 'S0'     ? 'lvl-exit' : 'lvl-inactive');
-  const stopBox   = _lvlBox(isHiMom ? 'HM S1':'S1', stopVal, bucket === 'S1'    ? 'lvl-exit' : 'lvl-inactive');
-  const eodBox    = _lvlBox('EOD',                  '—',     ['EOD','MANUAL'].includes(bucket) ? 'lvl-exit' : 'lvl-inactive');
+  const t1Box   = _lvlBox('T1',                    t1Val, bucket === 'T1'              ? 'lvl-exit' : 'lvl-inactive');
+  const t0Box   = _lvlBox('T0',                    t0Val, bucket === 'T0'              ? 'lvl-exit' : 'lvl-inactive');
+  const s0Box   = _lvlBox('S0',                    s0Val, bucket === 'S0'              ? 'lvl-exit' : 'lvl-inactive');
+  const s1Box   = _lvlBox(isHiMom ? 'HM S1' : 'S1', s1Val, bucket === 'S1'           ? 'lvl-exit' : 'lvl-inactive');
+  const eodBox  = _lvlBox('EOD',                   '—',   ['EOD','MANUAL'].includes(bucket) ? 'lvl-exit' : 'lvl-inactive');
 
-  return `<div class="lvl-boxes">${stopBox}${t1Box}${lockBox}${ceilBox}${eodBox}</div>`;
+  return `<div class="lvl-boxes">${s1Box}${t1Box}${t0Box}${s0Box}${eodBox}</div>`;
 }
 
 function renderHistLive() {
@@ -1742,7 +1757,8 @@ function renderHistLive() {
     const capTxt  = p.capital_deployed ? fmtK(p.capital_deployed) : '—';
     const scaleBadge = isScaled ? '<span class="scale-badge">×</span>' : '';
     const isShadow = (p.metadata?.shadow || (p.strategy_id||'').includes('SHADOW'));
-    const rowCls = isShadow ? 'pos-shadow' : 'pos-live';
+    const isPviEod = p.strategy_id === 'PVI_EOD';
+    const rowCls = isShadow ? 'pos-shadow' : isPviEod ? 'pos-eod' : 'pos-live';
 
     const isPvi = p.strategy_id === 'PVI';
     let levelsHtml = '—', mfeTxt = '—';
@@ -1785,7 +1801,7 @@ function renderHistLive() {
 
     rows.push(`<tr class="row ${rowCls}${isScaled ? ' capital-scaled' : ''}" data-tdk="${tdk}" data-sym="${p.symbol}" data-sid="${p.strategy_id}">
       <td><strong>${p.symbol || '—'}</strong>${scaleBadge}${entryTime ? `<br><span style="font-size:10px;color:#bbb;font-weight:400">${entryTime}</span>` : ''}</td>
-      <td style="color:var(--g);font-size:12px">${fmtStratName(p.strategy_id)}</td>
+      <td style="color:var(--g);font-size:12px">${fmtStratName(p.strategy_id)}${isPviEod ? ' <span style="font-size:9px;font-weight:700;padding:1px 4px;background:rgba(245,158,11,.15);color:#92400e;border-radius:2px;border:1px solid #fde68a">EOD</span>' : ''}</td>
       <td><span class="badge badge-${dir.toLowerCase()}">${dir}</span></td>
       <td>₹${fmtNum(p.entry_price)}</td>
       <td class="${unrlCls}" style="font-weight:700">${unrlTxt}</td>
@@ -1879,6 +1895,21 @@ async function toggleClosedFmRow(tr) {
     inner.innerHTML = '<div style="font-size:11px;color:#bbb">No FM data for this trade.</div>';
     return;
   }
+  // Build exit summary header
+  const ep = t.entry_price;
+  const xp = t.exit_price;
+  const actualPct = (ep && xp) ? ((ep - xp) / ep * 100) : null;
+  const bucket = _exitBucket(t.exit_type);
+  const bucketColor = {'T1':'#15803d','T0':'#15803d','S0':'#92400e','S1':'#b91c1c','EOD':'#777','MANUAL':'#777'}[bucket] || '#555';
+  const exitSummary = `<div style="font-size:11px;padding:4px 8px;margin-bottom:6px;background:#f9f9f9;border-radius:4px;border-left:3px solid ${bucketColor}">
+    Exit: <strong style="color:${bucketColor}">${t.exit_type || '—'}</strong> ·
+    Price ₹${xp ? fmtNum(xp) : '—'}${actualPct != null ? ` · <span style="color:${actualPct >= 0 ? 'var(--pos)' : 'var(--neg)'}"><strong>${actualPct >= 0 ? '+' : ''}${actualPct.toFixed(2)}%</strong></span>` : ''}
+  </div>`;
+  // Check if T1 column is all null (pre-migration trades)
+  const allT1Null = d.trail.every(r => r.t1_pct == null);
+  const t1Note = (allT1Null && bucket === 'T1')
+    ? `<div style="font-size:10px;color:#d97706;padding:2px 8px;margin-bottom:4px">⚠ T1 column: data not recorded for pre-migration trades. Exit at ₹${xp} (${actualPct != null ? (actualPct >= 0 ? '+' : '') + actualPct.toFixed(2) + '%' : '—'}) was the T1 resting order price.</div>`
+    : '';
   const rows = d.trail.map((r, i) => {
     const ct = r.ceiling_touches || 0;
     const s0Cls = ct >= 2 ? 'color:var(--pos)' : ct === 1 ? 'color:#d97706' : 'color:#bbb';
@@ -1894,7 +1925,7 @@ async function toggleClosedFmRow(tr) {
       <td style="max-width:260px;word-break:break-word">${r.rationale || '—'}</td>
     </tr>`;
   }).join('');
-  inner.innerHTML = `<table class="fm-detail-table">
+  inner.innerHTML = exitSummary + t1Note + `<table class="fm-detail-table">
     <thead><tr><th>Time</th><th>Stance</th><th>MFE%</th><th>T1</th><th>T0</th><th>S0</th><th>Rationale</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
