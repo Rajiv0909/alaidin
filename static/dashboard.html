@@ -790,6 +790,7 @@ let _pnlData          = null;
 let _equityChart      = null;
 let _liveTimer        = null;
 let _obsTimer         = null;
+let _expandOpen       = 0;    // count of open expansion rows; >0 pauses auto-refresh
 let _subscriptions    = [];
 let _currentView      = 'invest';
 const _specLoaded     = {};
@@ -1435,6 +1436,7 @@ async function fetchJson(url, opts) {
 }
 
 async function refreshAll() {
+  if (_expandOpen > 0) return;   // don't refresh while a trade is expanded
   const tasks = [refreshObsStrategies(), refreshObsLive(), refreshPnl(), refreshEquity()];
   if (USER_ROLE !== 'observer') {
     tasks.push(refreshLive(), refreshHistory());
@@ -1701,8 +1703,12 @@ function _exitBucket(exitType) {
 }
 
 function pviClosedLevels(trade) {
-  const bucket = _exitBucket(trade.exit_type);
   const meta = trade.metadata || {};
+  if (trade.fill_status === 'NO_FILL' || trade.exit_type === 'NO_FILL') {
+    const escN = meta.esc_cycle ? ` · ESC${meta.esc_cycle}` : '';
+    return `<div class="lvl-boxes"><span class="exit-badge" style="background:#444;color:#bbb">NEVER FILLED${escN}</span></div>`;
+  }
+  const bucket = _exitBucket(trade.exit_type);
   const ep = trade.entry_price || 0;
   const xp = trade.exit_price;
   const sp = trade.stop_price;
@@ -1867,6 +1873,7 @@ async function toggleLiveFmRow(tr) {
   const opening = detRow.style.display === 'none';
   detRow.style.display = opening ? '' : 'none';
   tr.style.outline = opening ? '2px solid var(--y)' : '';
+  _expandOpen = Math.max(0, _expandOpen + (opening ? 1 : -1));
   if (!opening || detRow.dataset.loaded) return;
   detRow.dataset.loaded = '1';
 
@@ -1960,6 +1967,7 @@ async function toggleClosedFmRow(tr) {
   const opening = detRow.style.display === 'none';
   detRow.style.display = opening ? '' : 'none';
   tr.style.outline = opening ? '2px solid var(--y)' : '';
+  _expandOpen = Math.max(0, _expandOpen + (opening ? 1 : -1));
   if (!opening || detRow.dataset.loaded) return;
   detRow.dataset.loaded = '1';
 
@@ -2141,13 +2149,14 @@ function renderTrades(trades) {
     } else {
       dateCell = entryDt ? fmt(entryDt) : '—';
     }
-    const gross = t.gross_pnl_rs != null ? fmtRs(t.gross_pnl_rs) : '—';
-    const chg   = t.charges_rs   != null ? '₹' + fmtNum(t.charges_rs) : '—';
-    const net   = t.net_pnl_rs   != null ? fmtRs(t.net_pnl_rs) : '—';
-    const netCls= t.net_pnl_rs   != null ? (t.net_pnl_rs >= 0 ? 'green' : 'red') : '';
+    const isNoFill = t.fill_status === 'NO_FILL' || t.exit_type === 'NO_FILL';
+    const gross = isNoFill ? '—' : (t.gross_pnl_rs != null ? fmtRs(t.gross_pnl_rs) : '—');
+    const chg   = isNoFill ? '—' : (t.charges_rs   != null ? '₹' + fmtNum(t.charges_rs) : '—');
+    const net   = isNoFill ? '—' : (t.net_pnl_rs   != null ? fmtRs(t.net_pnl_rs) : '—');
+    const netCls= isNoFill ? '' : (t.net_pnl_rs   != null ? (t.net_pnl_rs >= 0 ? 'green' : 'red') : '');
     const dir   = t.direction || '';
     const ep    = t.entry_price ? '₹' + fmtNum(t.entry_price) : '—';
-    const xp    = t.exit_price  ? '₹' + fmtNum(t.exit_price)  : '—';
+    const xp    = isNoFill ? '—' : (t.exit_price  ? '₹' + fmtNum(t.exit_price)  : '—');
     const meta  = t.metadata || {};
     const isScaled = (meta.nifty_intra_scale != null && meta.nifty_intra_scale !== 1.0) ||
                      (meta.presignal_scale    != null && meta.presignal_scale    !== 1.0);
@@ -2156,8 +2165,9 @@ function renderTrades(trades) {
     const agentRaw  = t.agent_approved_by || '';
     const agentTxt  = (agentRaw && agentRaw !== 'RULE_BASED')
       ? `<span class="agent-chip">${agentRaw.replace('pvi_entry_agent_','v').replace(/_agent$/,'')}</span>` : '—';
-    const exitCell = isPviClosed ? pviClosedLevels(t) : exitBadge(t.exit_type, meta);
-    allRows.push(`<tr class="row${isScaled ? ' capital-scaled' : ''}" data-tdk="${tdk2}">
+    const exitCell = isPviClosed ? pviClosedLevels(t)
+      : (isNoFill ? `<span class="exit-badge" style="background:#444;color:#bbb">NEVER FILLED</span>` : exitBadge(t.exit_type, meta));
+    allRows.push(`<tr class="row${isScaled ? ' capital-scaled' : ''}${isNoFill ? ' row-no-fill' : ''}" data-tdk="${tdk2}"${isNoFill ? ' style="opacity:.55"' : ''}>
       <td>${dateCell}</td>
       <td><strong>${t.symbol || '—'}</strong>${scaleBadge}</td>
       <td style="color:var(--g);font-size:12px">${fmtStratName(t.strategy_id)}</td>
