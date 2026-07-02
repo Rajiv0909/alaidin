@@ -645,7 +645,7 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
         <table>
           <thead><tr>
             <th>Symbol</th><th>Strategy</th><th>Dir</th>
-            <th>Entry</th><th>Unrealized</th><th>MFE</th><th>Capital</th><th title="Stop / hard-loss level">S1</th><th title="Take-profit resting order">T1</th><th title="Profit lock level">T0</th><th title="Loss ceiling">S0</th>
+            <th>Entry</th><th>Unrealized</th><th>MFE</th><th>Capital</th><th title="Take-profit resting order">T1</th><th title="Profit lock level">T0</th><th title="Loss ceiling">S0</th><th title="Hard stop">S1</th>
           </tr></thead>
           <tbody id="hist-live-body"></tbody>
         </table>
@@ -1733,7 +1733,7 @@ function pviClosedLevels(trade) {
   const s1Box   = _lvlBox(isHiMom ? 'HM S1' : 'S1', s1Val, bucket === 'S1'           ? 'lvl-exit' : 'lvl-inactive');
   const eodBox  = _lvlBox('EOD',                   '—',   ['EOD','MANUAL'].includes(bucket) ? 'lvl-exit' : 'lvl-inactive');
 
-  return `<div class="lvl-boxes">${s1Box}${t1Box}${t0Box}${s0Box}${eodBox}</div>`;
+  return `<div class="lvl-boxes">${t1Box}${t0Box}${s0Box}${s1Box}${eodBox}</div>`;
 }
 
 function renderHistLive() {
@@ -1769,31 +1769,40 @@ function renderHistLive() {
 
     const isPvi = p.strategy_id === 'PVI';
     let mfeTxt = '—';
-    // Build level cells (S1, T1, T0, S0) — each a separate <td class="lvl-td">
-    let s1Td = '<td class="lvl-td lc-def">—</td>';
+    // Level cells in order T1 | T0 | S0 | S1
     let t1Td = '<td class="lvl-td lc-def">—</td>';
     let t0Td = '<td class="lvl-td lc-def">—</td>';
     let s0Td = '<td class="lvl-td lc-def">—</td>';
+    let s1Td = '<td class="lvl-td lc-def">—</td>';
 
     if (isPvi) {
-      // S1 = hard stop (above entry for SHORT); show abs distance as positive %
+      // S1 = hard stop (above entry for SHORT); abs distance as positive %
       const stopPct = (p.stop_price && p.entry_price)
         ? Math.abs((p.stop_price - p.entry_price) / p.entry_price * 100) : null;
       const isHiMom = meta.presignal_hi_mom === true || meta.presignal_hi_mom === 'true';
-      s1Td = `<td class="lvl-td lc-def" title="${isHiMom ? 'Hi-Mom stop: 2.5%' : 'Stop: 1.5%'}">` +
+      s1Td = `<td class="lvl-td lc-def" title="${isHiMom ? 'Hi-Mom stop' : 'Hard stop'}">` +
              `${stopPct != null ? stopPct.toFixed(1) + '%' : '—'}</td>`;
+
+      // T1 initial = target_price distance (VP target, always available)
+      const t1InitAbs = (p.target_price && p.entry_price)
+        ? Math.abs((p.target_price - p.entry_price) / p.entry_price * 100) : null;
 
       const fm = _fmLatest[p.symbol];
       if (fm) {
-        // T1: FM resting take-profit — stored negative for SHORT, show as positive profit %
-        const t1Abs = fm.t1_pct != null ? Math.abs(fm.t1_pct) : null;
-        t1Td = `<td class="lvl-td ${fm.t1_pct != null ? 'lc-active' : 'lc-def'}">` +
+        // T1: FM resting order (t1_lock_pct, negative for SHORT → abs = positive profit %)
+        // Fall back to initial target_price distance when FM hasn't armed T1 yet
+        const t1FmAbs = fm.t1_pct != null ? Math.abs(fm.t1_pct) : null;
+        const t1Abs   = t1FmAbs ?? t1InitAbs;
+        const t1Armed = t1FmAbs != null;
+        t1Td = `<td class="lvl-td ${t1Armed ? 'lc-active' : 'lc-def'}" title="${t1Armed ? 'FM armed' : 'Initial VP target'}">` +
                `${t1Abs != null ? t1Abs.toFixed(2) + '%' : '—'}</td>`;
+
         // T0: profit lock — stored negative for SHORT, show as positive profit %
         const t0Abs = fm.lock_pct != null ? Math.abs(fm.lock_pct) : null;
         t0Td = `<td class="lvl-td ${fm.lock_activated ? 'lc-active' : 'lc-def'}">` +
                `${t0Abs != null ? t0Abs.toFixed(2) + '%' : '—'}</td>`;
-        // S0: ceiling — stored positive for SHORT (above entry = loss side)
+
+        // S0: ceiling — positive for SHORT (above entry = loss side)
         const ct = fm.ceiling_touches || 0;
         const s0Cls = ct >= 2 ? 'lc-active' : ct === 1 ? 'lc-warn' : 'lc-def';
         s0Td = `<td class="lvl-td ${s0Cls}">` +
@@ -1801,29 +1810,20 @@ function renderHistLive() {
 
         if (fm.mfe_pct != null) mfeTxt = `<span style="color:var(--pos);font-size:11px">+${fm.mfe_pct.toFixed(2)}%</span>`;
       } else {
-        // No FM yet — show stop in S1, others blank with hint
-        s1Td = `<td class="lvl-td lc-def" title="awaiting FM">${stopPct != null ? stopPct.toFixed(1) + '%' : '—'} <span style="font-size:9px;color:#bbb">▸FM</span></td>`;
+        // No FM yet — T1 shows initial target, others blank with hint
+        t1Td = `<td class="lvl-td lc-def" title="Initial VP target; awaiting FM">` +
+               `${t1InitAbs != null ? t1InitAbs.toFixed(2) + '%' : '—'} <span style="font-size:9px;color:#bbb">▸</span></td>`;
       }
 
     } else if (isPviEod) {
-      // PVI_EOD (LONG): show stop abs% in S1, FM EOD posture in T1
+      // PVI_EOD: show only what strategy publishes; S1 = hard stop abs %
+      // T1/T0/S0 left blank until strategy adds them (user will align labels in code)
       const stopPct = (p.stop_price && p.entry_price)
         ? Math.abs((p.stop_price - p.entry_price) / p.entry_price * 100) : null;
       s1Td = `<td class="lvl-td lc-def">${stopPct != null ? stopPct.toFixed(1) + '%' : '—'}</td>`;
-      const eodLog = (meta._fm_eod_log || []);
-      const latest = eodLog[eodLog.length - 1] || {};  // last entry = most recent
-      const posture = latest.posture || '';
-      const conf = latest.confidence;
-      const gap  = meta.gap_pct;
-      const postureColor = posture === 'TIGHTEN' ? 'lc-warn' : posture === 'GIVE_ROOM' ? 'lc-active' : 'lc-def';
-      t1Td = `<td class="lvl-td ${postureColor}" title="${latest.rationale || ''}" style="font-size:10px;max-width:90px;overflow:hidden;text-overflow:ellipsis">` +
-             `${posture || '—'}${conf != null ? ` ${conf}%` : ''}</td>`;
-      t0Td = `<td class="lvl-td lc-def" title="Gap %">${gap != null ? gap.toFixed(1) + '%↑' : '—'}</td>`;
-      const retrace = latest.trail_retrace_pct;
-      s0Td = `<td class="lvl-td lc-def">${retrace != null ? retrace.toFixed(1) + '%' : '—'}</td>`;
 
     } else {
-      // Other strategies: show stop % in S1, agent chip in T1
+      // Other strategies: S1 = stop abs%, T1 = agent chip
       const stopPct = (p.stop_price && p.entry_price)
         ? Math.abs((p.stop_price - p.entry_price) / p.entry_price * 100) : null;
       if (stopPct != null) s1Td = `<td class="lvl-td lc-def">${stopPct.toFixed(1)}%</td>`;
@@ -1841,7 +1841,7 @@ function renderHistLive() {
       <td class="${unrlCls}" style="font-weight:700">${unrlTxt}</td>
       <td>${mfeTxt}</td>
       <td style="color:var(--g)">${capTxt}</td>
-      ${s1Td}${t1Td}${t0Td}${s0Td}
+      ${t1Td}${t0Td}${s0Td}${s1Td}
     </tr>`);
     // Detail expansion row (hidden by default)
     rows.push(`<tr class="fm-detail-row" id="fmdet-${tdk}" style="display:none">
