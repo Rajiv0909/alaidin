@@ -1924,13 +1924,18 @@ async function toggleLiveFmRow(tr) {
     const t0Cls = r.lock_activated ? 'color:var(--pos)' : 'color:#555';
     const t1Cls = r.t1_pct != null ? 'color:var(--pos);font-weight:700' : 'color:#555';
     const isFirst = i === 0;
-    // Close% = profit from entry (SHORT: positive = profit)
     const closePct = (ep && r.price) ? (ep - r.price) / ep * 100 : null;
     const closeCls = closePct == null ? 'color:#555' : closePct >= 0 ? 'color:var(--pos)' : 'color:var(--neg)';
-    // T1/T0 stored negative for SHORT → show as positive profit %
     const t1Show = r.t1_pct != null ? Math.abs(r.t1_pct).toFixed(2) + '%' : '—';
     const t0Show = r.lock_pct != null ? Math.abs(r.lock_pct).toFixed(2) + '%' : '—';
-    return `<tr${isFirst ? ' style="font-weight:700"' : ''}>
+    const t0Abs  = r.lock_pct != null ? Math.abs(r.lock_pct) : null;
+    const s0Raw  = r.ceil_pct;
+    const pastT0 = closePct != null && t0Abs != null && closePct > t0Abs;
+    const pastS0 = closePct != null && s0Raw != null && closePct > s0Raw;
+    const rowBg  = pastS0 ? 'background:rgba(22,163,74,.08);font-weight:800'
+                 : pastT0 ? 'background:rgba(99,102,241,.06);font-weight:800'
+                 : isFirst ? 'font-weight:700' : '';
+    return `<tr${rowBg ? ` style="${rowBg}"` : ''}>
       <td>${r.bar_ist}</td>
       <td>${r.stance || '—'}</td>
       <td style="${closeCls}">${closePct != null ? (closePct >= 0 ? '+' : '') + closePct.toFixed(2) + '%' : '—'}</td>
@@ -1990,13 +1995,18 @@ async function toggleClosedFmRow(tr) {
     const s0Cls = ct >= 2 ? 'color:var(--pos)' : ct === 1 ? 'color:#d97706' : 'color:#555';
     const t0Cls = r.lock_activated ? 'color:var(--pos)' : 'color:#555';
     const t1Cls = r.t1_pct != null ? 'color:var(--pos);font-weight:700' : 'color:#555';
-    // Close% = profit from entry (SHORT: positive = profit)
     const closePct = (ep2 && r.price) ? (ep2 - r.price) / ep2 * 100 : null;
     const closeCls = closePct == null ? 'color:#555' : closePct >= 0 ? 'color:var(--pos)' : 'color:var(--neg)';
-    // T1/T0 stored negative for SHORT → show as positive profit %
     const t1Show = r.t1_pct != null ? Math.abs(r.t1_pct).toFixed(2) + '%' : '—';
     const t0Show = r.lock_pct != null ? Math.abs(r.lock_pct).toFixed(2) + '%' : '—';
-    return `<tr${i === 0 ? ' style="font-weight:700"' : ''}>
+    const t0Abs  = r.lock_pct != null ? Math.abs(r.lock_pct) : null;
+    const s0Raw  = r.ceil_pct;
+    const pastT0 = closePct != null && t0Abs != null && closePct > t0Abs;
+    const pastS0 = closePct != null && s0Raw != null && closePct > s0Raw;
+    const rowBg  = pastS0 ? 'background:rgba(22,163,74,.08);font-weight:800'
+                 : pastT0 ? 'background:rgba(99,102,241,.06);font-weight:800'
+                 : i === 0 ? 'font-weight:700' : '';
+    return `<tr${rowBg ? ` style="${rowBg}"` : ''}>
       <td>${r.bar_ist}</td>
       <td>${r.stance || '—'}</td>
       <td style="${closeCls}">${closePct != null ? (closePct >= 0 ? '+' : '') + closePct.toFixed(2) + '%' : '—'}</td>
