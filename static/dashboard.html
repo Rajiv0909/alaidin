@@ -320,13 +320,19 @@ input[type=checkbox] { accent-color: var(--y); width: 15px; height: 15px; cursor
 .agent-save-status { font-size: 11px; color: var(--g); }
 /* Live table level boxes */
 .lvl-box { display:inline-flex;flex-direction:column;align-items:center;padding:2px 7px;border-radius:3px;border:1.5px solid;font-size:9px;font-weight:800;line-height:1.3;cursor:default; }
-.lvl-box .lvl-label { font-size:8px;opacity:.7;text-transform:uppercase;letter-spacing:.5px; }
+.lvl-box .lvl-label { font-size:8px;opacity:1;text-transform:uppercase;letter-spacing:.5px; }
 .lvl-box .lvl-val   { font-size:11px;font-weight:800; }
-.lvl-inactive { border-color:#e8e8e8;background:#fafafa;color:#bbb; }
+.lvl-inactive { border-color:#e8e8e8;background:#fafafa;color:#555; }
 .lvl-warn     { border-color:#f59e0b;background:rgba(245,158,11,.12);color:#92400e; }
 .lvl-active   { border-color:#16a34a;background:rgba(22,163,74,.12);color:#14532d; }
 .lvl-exit     { border-color:#111;background:rgba(0,0,0,.06);color:#111; }
 .lvl-boxes    { display:flex;gap:5px;align-items:flex-start; }
+/* Column-based level cells in live table */
+td.lvl-td { text-align:center;font-size:11px;font-weight:700;padding:4px 6px !important;white-space:nowrap; }
+td.lvl-td.lc-active { color:#14532d;background:rgba(22,163,74,.07); }
+td.lvl-td.lc-warn   { color:#92400e;background:rgba(245,158,11,.07); }
+td.lvl-td.lc-exit   { color:#111;background:rgba(0,0,0,.05);font-weight:900; }
+td.lvl-td.lc-def    { color:#555; }
 /* Exit type badges for closed trade history */
 .exit-badge { font-size:9px;font-weight:700;padding:1px 5px;border-radius:2px;display:inline-block;white-space:nowrap; }
 .exit-profit { background:rgba(22,163,74,.1);color:#15803d;border:1px solid #bbf7d0; }
@@ -639,7 +645,7 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
         <table>
           <thead><tr>
             <th>Symbol</th><th>Strategy</th><th>Dir</th>
-            <th>Entry</th><th>Unrealized</th><th>MFE</th><th>Capital</th><th>Levels &amp; Rationale</th>
+            <th>Entry</th><th>Unrealized</th><th>MFE</th><th>Capital</th><th title="Stop / hard-loss level">S1</th><th title="Take-profit resting order">T1</th><th title="Profit lock level">T0</th><th title="Loss ceiling">S0</th>
           </tr></thead>
           <tbody id="hist-live-body"></tbody>
         </table>
@@ -749,6 +755,7 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
             <tr style="color:var(--g);text-align:left;border-bottom:1px solid var(--hair)">
               <th style="padding:4px 6px">Time</th>
               <th style="padding:4px 6px">Stance</th>
+              <th style="padding:4px 6px">Close%</th>
               <th style="padding:4px 6px">MFE%</th>
               <th style="padding:4px 6px">T1</th>
               <th style="padding:4px 6px">T0</th>
@@ -1761,41 +1768,68 @@ function renderHistLive() {
     const rowCls = isShadow ? 'pos-shadow' : isPviEod ? 'pos-eod' : 'pos-live';
 
     const isPvi = p.strategy_id === 'PVI';
-    let levelsHtml = '—', mfeTxt = '—';
+    let mfeTxt = '—';
+    // Build level cells (S1, T1, T0, S0) — each a separate <td class="lvl-td">
+    let s1Td = '<td class="lvl-td lc-def">—</td>';
+    let t1Td = '<td class="lvl-td lc-def">—</td>';
+    let t0Td = '<td class="lvl-td lc-def">—</td>';
+    let s0Td = '<td class="lvl-td lc-def">—</td>';
+
     if (isPvi) {
-      // S1 box always shown (hard stop, from trade data)
+      // S1 = hard stop (above entry for SHORT); show abs distance as positive %
       const stopPct = (p.stop_price && p.entry_price)
-        ? (p.stop_price - p.entry_price) / p.entry_price * 100 : null;
+        ? Math.abs((p.stop_price - p.entry_price) / p.entry_price * 100) : null;
       const isHiMom = meta.presignal_hi_mom === true || meta.presignal_hi_mom === 'true';
-      const s1Box = _lvlBox(isHiMom ? 'HM S1' : 'S1',
-        stopPct != null ? '+' + stopPct.toFixed(1) + '%' : '—', 'lvl-inactive');
+      s1Td = `<td class="lvl-td lc-def" title="${isHiMom ? 'Hi-Mom stop: 2.5%' : 'Stop: 1.5%'}">` +
+             `${stopPct != null ? stopPct.toFixed(1) + '%' : '—'}</td>`;
 
       const fm = _fmLatest[p.symbol];
       if (fm) {
-        // T1 box: FM's t1_lock_pct (tick-based take-profit); green when armed
-        const t1Val = fm.t1_pct != null ? fm.t1_pct.toFixed(2) + '%' : '—';
-        const t1Box = _lvlBox('T1', t1Val, fm.t1_pct != null ? 'lvl-active' : 'lvl-inactive');
-
-        // T0 box: profit lock; green if lock_activated
-        const t0Val = fm.lock_pct != null ? fm.lock_pct.toFixed(2) + '%' : '—';
-        const t0Box = _lvlBox('T0', t0Val, fm.lock_activated ? 'lvl-active' : 'lvl-inactive');
-
-        // S0 box: ceiling; inactive=0 touches, amber=1, green=2+
-        const s0Val = fm.ceil_pct != null ? '+' + fm.ceil_pct.toFixed(2) + '%' : '—';
+        // T1: FM resting take-profit — stored negative for SHORT, show as positive profit %
+        const t1Abs = fm.t1_pct != null ? Math.abs(fm.t1_pct) : null;
+        t1Td = `<td class="lvl-td ${fm.t1_pct != null ? 'lc-active' : 'lc-def'}">` +
+               `${t1Abs != null ? t1Abs.toFixed(2) + '%' : '—'}</td>`;
+        // T0: profit lock — stored negative for SHORT, show as positive profit %
+        const t0Abs = fm.lock_pct != null ? Math.abs(fm.lock_pct) : null;
+        t0Td = `<td class="lvl-td ${fm.lock_activated ? 'lc-active' : 'lc-def'}">` +
+               `${t0Abs != null ? t0Abs.toFixed(2) + '%' : '—'}</td>`;
+        // S0: ceiling — stored positive for SHORT (above entry = loss side)
         const ct = fm.ceiling_touches || 0;
-        const s0Cls = ct >= 2 ? 'lvl-active' : ct === 1 ? 'lvl-warn' : 'lvl-inactive';
-        const s0Box = _lvlBox('S0', s0Val, s0Cls);
+        const s0Cls = ct >= 2 ? 'lc-active' : ct === 1 ? 'lc-warn' : 'lc-def';
+        s0Td = `<td class="lvl-td ${s0Cls}">` +
+               `${fm.ceil_pct != null ? fm.ceil_pct.toFixed(2) + '%' : '—'}${ct ? ` ×${ct}` : ''}</td>`;
 
-        const rationale = fm.rationale ? `<div class="lvl-rationale">${fm.rationale.slice(0,120)}${fm.rationale.length > 120 ? '…' : ''}</div>` : '';
-        levelsHtml = `<div class="lvl-cell"><div class="lvl-boxes">${s1Box}${t1Box}${t0Box}${s0Box}</div>${rationale}</div>`;
         if (fm.mfe_pct != null) mfeTxt = `<span style="color:var(--pos);font-size:11px">+${fm.mfe_pct.toFixed(2)}%</span>`;
       } else {
-        levelsHtml = `<div class="lvl-cell"><div class="lvl-boxes">${s1Box}</div><span style="font-size:10px;color:#bbb">awaiting FM</span></div>`;
+        // No FM yet — show stop in S1, others blank with hint
+        s1Td = `<td class="lvl-td lc-def" title="awaiting FM">${stopPct != null ? stopPct.toFixed(1) + '%' : '—'} <span style="font-size:9px;color:#bbb">▸FM</span></td>`;
       }
+
+    } else if (isPviEod) {
+      // PVI_EOD (LONG): show stop abs% in S1, FM EOD posture in T1
+      const stopPct = (p.stop_price && p.entry_price)
+        ? Math.abs((p.stop_price - p.entry_price) / p.entry_price * 100) : null;
+      s1Td = `<td class="lvl-td lc-def">${stopPct != null ? stopPct.toFixed(1) + '%' : '—'}</td>`;
+      const eodLog = (meta._fm_eod_log || []);
+      const latest = eodLog[eodLog.length - 1] || {};  // last entry = most recent
+      const posture = latest.posture || '';
+      const conf = latest.confidence;
+      const gap  = meta.gap_pct;
+      const postureColor = posture === 'TIGHTEN' ? 'lc-warn' : posture === 'GIVE_ROOM' ? 'lc-active' : 'lc-def';
+      t1Td = `<td class="lvl-td ${postureColor}" title="${latest.rationale || ''}" style="font-size:10px;max-width:90px;overflow:hidden;text-overflow:ellipsis">` +
+             `${posture || '—'}${conf != null ? ` ${conf}%` : ''}</td>`;
+      t0Td = `<td class="lvl-td lc-def" title="Gap %">${gap != null ? gap.toFixed(1) + '%↑' : '—'}</td>`;
+      const retrace = latest.trail_retrace_pct;
+      s0Td = `<td class="lvl-td lc-def">${retrace != null ? retrace.toFixed(1) + '%' : '—'}</td>`;
+
     } else {
+      // Other strategies: show stop % in S1, agent chip in T1
+      const stopPct = (p.stop_price && p.entry_price)
+        ? Math.abs((p.stop_price - p.entry_price) / p.entry_price * 100) : null;
+      if (stopPct != null) s1Td = `<td class="lvl-td lc-def">${stopPct.toFixed(1)}%</td>`;
       const agentRaw = p.agent_approved_by || '';
       if (agentRaw && agentRaw !== 'RULE_BASED') {
-        levelsHtml = `<span class="agent-chip">${agentRaw.replace('pvi_entry_agent_','v').replace(/_agent$/,'')}</span>`;
+        t1Td = `<td class="lvl-td lc-def"><span class="agent-chip">${agentRaw.replace('pvi_entry_agent_','v').replace(/_agent$/,'')}</span></td>`;
       }
     }
 
@@ -1807,11 +1841,11 @@ function renderHistLive() {
       <td class="${unrlCls}" style="font-weight:700">${unrlTxt}</td>
       <td>${mfeTxt}</td>
       <td style="color:var(--g)">${capTxt}</td>
-      <td>${levelsHtml}</td>
+      ${s1Td}${t1Td}${t0Td}${s0Td}
     </tr>`);
-    // FM detail expansion row (hidden by default)
+    // Detail expansion row (hidden by default)
     rows.push(`<tr class="fm-detail-row" id="fmdet-${tdk}" style="display:none">
-      <td colspan="8"><div class="fm-detail-inner" id="fmdet-inner-${tdk}"><div style="color:#bbb;font-size:11px">Loading…</div></div></td>
+      <td colspan="11"><div class="fm-detail-inner" id="fmdet-inner-${tdk}"><div style="color:#bbb;font-size:11px">Loading…</div></div></td>
     </tr>`);
   });
   tbody.innerHTML = rows.join('');
@@ -1838,6 +1872,38 @@ async function toggleLiveFmRow(tr) {
 
   const p = _tradeRows[+tdk];
   const isPvi = p?.strategy_id === 'PVI';
+  const isPviEodLive = p?.strategy_id === 'PVI_EOD';
+
+  // PVI_EOD: show fm_eod_log from metadata (no separate API call)
+  if (isPviEodLive) {
+    const meta = p.metadata || {};
+    const eodLog = meta._fm_eod_log || [];
+    if (!eodLog.length) {
+      inner.innerHTML = '<div style="font-size:11px;color:#bbb">No EOD FM log available.</div>';
+      return;
+    }
+    const gapPct = meta.gap_pct != null ? meta.gap_pct.toFixed(2) + '%' : '—';
+    const zone   = meta.pvi_zone || '—';
+    const header = `<div style="font-size:11px;padding:3px 8px;margin-bottom:6px;background:#fffbeb;border-left:3px solid #f59e0b">
+      Gap: <strong>${gapPct}</strong> · Zone: <strong>${zone}</strong> · Entry: <strong>₹${p.entry_price ? fmtNum(p.entry_price) : '—'}</strong>
+    </div>`;
+    const logRows = eodLog.map(e => {
+      const pCls = e.posture === 'TIGHTEN' ? 'color:#92400e' : e.posture === 'GIVE_ROOM' ? 'color:#14532d' : 'color:#555';
+      return `<tr>
+        <td>${e.ts || '—'}</td>
+        <td style="${pCls};font-weight:700">${e.posture || '—'}</td>
+        <td>${e.confidence != null ? e.confidence + '%' : '—'}</td>
+        <td>${e.trail_retrace_pct != null ? e.trail_retrace_pct.toFixed(1) + '%' : '—'}</td>
+        <td style="max-width:320px;word-break:break-word">${e.rationale || '—'}</td>
+      </tr>`;
+    }).join('');
+    inner.innerHTML = header + `<table class="fm-detail-table">
+      <thead><tr><th>Time</th><th>Posture</th><th>Confidence</th><th>Trail Retrace</th><th>Rationale</th></tr></thead>
+      <tbody>${logRows}</tbody>
+    </table>`;
+    return;
+  }
+
   if (!isPvi) {
     inner.innerHTML = '<div style="font-size:11px;color:#bbb">No FM trail for this strategy.</div>';
     return;
@@ -1845,6 +1911,7 @@ async function toggleLiveFmRow(tr) {
   const toISTDate = dt => new Date(dt).toLocaleDateString('en-CA', {timeZone:'Asia/Kolkata'});
   const date = p.trade_date || toISTDate(new Date());
   const sym  = p.symbol;
+  const ep   = p.entry_price || 0;  // for Close% computation
   inner.innerHTML = '<div style="color:#bbb;font-size:11px">Loading FM trail…</div>';
   const d = await fetchJson(`/api/pvi/fm-trail?symbol=${encodeURIComponent(sym)}&date=${date}`);
   if (d.error || !d.trail?.length) {
@@ -1853,22 +1920,29 @@ async function toggleLiveFmRow(tr) {
   }
   const rows = d.trail.map((r, i) => {
     const ct = r.ceiling_touches || 0;
-    const s0Cls = ct >= 2 ? 'color:var(--pos)' : ct === 1 ? 'color:#d97706' : 'color:#bbb';
-    const t0Cls = r.lock_activated ? 'color:var(--pos)' : 'color:#bbb';
-    const t1Cls = r.t1_pct != null ? 'color:var(--pos);font-weight:700' : 'color:#bbb';
+    const s0Cls = ct >= 2 ? 'color:var(--pos)' : ct === 1 ? 'color:#d97706' : 'color:#555';
+    const t0Cls = r.lock_activated ? 'color:var(--pos)' : 'color:#555';
+    const t1Cls = r.t1_pct != null ? 'color:var(--pos);font-weight:700' : 'color:#555';
     const isFirst = i === 0;
+    // Close% = profit from entry (SHORT: positive = profit)
+    const closePct = (ep && r.price) ? (ep - r.price) / ep * 100 : null;
+    const closeCls = closePct == null ? 'color:#555' : closePct >= 0 ? 'color:var(--pos)' : 'color:var(--neg)';
+    // T1/T0 stored negative for SHORT → show as positive profit %
+    const t1Show = r.t1_pct != null ? Math.abs(r.t1_pct).toFixed(2) + '%' : '—';
+    const t0Show = r.lock_pct != null ? Math.abs(r.lock_pct).toFixed(2) + '%' : '—';
     return `<tr${isFirst ? ' style="font-weight:700"' : ''}>
       <td>${r.bar_ist}</td>
       <td>${r.stance || '—'}</td>
+      <td style="${closeCls}">${closePct != null ? (closePct >= 0 ? '+' : '') + closePct.toFixed(2) + '%' : '—'}</td>
       <td>${r.mfe_pct != null ? '+' + r.mfe_pct.toFixed(2) + '%' : '—'}</td>
-      <td style="${t1Cls}">${r.t1_pct != null ? r.t1_pct.toFixed(2) + '%' : '—'}</td>
-      <td style="${t0Cls}">${r.lock_pct != null ? r.lock_pct.toFixed(2) + '%' : '—'}</td>
-      <td style="${s0Cls}">${r.ceil_pct != null ? '+' + r.ceil_pct.toFixed(2) + '%' : '—'}${ct ? ` (${ct})` : ''}</td>
-      <td style="max-width:280px;word-break:break-word">${r.rationale || '—'}</td>
+      <td style="${t1Cls}">${t1Show}</td>
+      <td style="${t0Cls}">${t0Show}</td>
+      <td style="${s0Cls}">${r.ceil_pct != null ? r.ceil_pct.toFixed(2) + '%' : '—'}${ct ? ` ×${ct}` : ''}</td>
+      <td style="max-width:260px;word-break:break-word">${r.rationale || '—'}</td>
     </tr>`;
   }).join('');
   inner.innerHTML = `<table class="fm-detail-table">
-    <thead><tr><th>Time</th><th>Stance</th><th>MFE%</th><th>T1</th><th>T0</th><th>S0</th><th>Rationale</th></tr></thead>
+    <thead><tr><th>Time</th><th>Stance</th><th>Close%</th><th>MFE%</th><th>T1</th><th>T0</th><th>S0</th><th>Rationale</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
 }
@@ -1910,23 +1984,31 @@ async function toggleClosedFmRow(tr) {
   const t1Note = (allT1Null && bucket === 'T1')
     ? `<div style="font-size:10px;color:#d97706;padding:2px 8px;margin-bottom:4px">⚠ T1 column: data not recorded for pre-migration trades. Exit at ₹${xp} (${actualPct != null ? (actualPct >= 0 ? '+' : '') + actualPct.toFixed(2) + '%' : '—'}) was the T1 resting order price.</div>`
     : '';
+  const ep2 = t.entry_price || 0;
   const rows = d.trail.map((r, i) => {
     const ct = r.ceiling_touches || 0;
-    const s0Cls = ct >= 2 ? 'color:var(--pos)' : ct === 1 ? 'color:#d97706' : 'color:#bbb';
-    const t0Cls = r.lock_activated ? 'color:var(--pos)' : 'color:#bbb';
-    const t1Cls = r.t1_pct != null ? 'color:var(--pos);font-weight:700' : 'color:#bbb';
+    const s0Cls = ct >= 2 ? 'color:var(--pos)' : ct === 1 ? 'color:#d97706' : 'color:#555';
+    const t0Cls = r.lock_activated ? 'color:var(--pos)' : 'color:#555';
+    const t1Cls = r.t1_pct != null ? 'color:var(--pos);font-weight:700' : 'color:#555';
+    // Close% = profit from entry (SHORT: positive = profit)
+    const closePct = (ep2 && r.price) ? (ep2 - r.price) / ep2 * 100 : null;
+    const closeCls = closePct == null ? 'color:#555' : closePct >= 0 ? 'color:var(--pos)' : 'color:var(--neg)';
+    // T1/T0 stored negative for SHORT → show as positive profit %
+    const t1Show = r.t1_pct != null ? Math.abs(r.t1_pct).toFixed(2) + '%' : '—';
+    const t0Show = r.lock_pct != null ? Math.abs(r.lock_pct).toFixed(2) + '%' : '—';
     return `<tr${i === 0 ? ' style="font-weight:700"' : ''}>
       <td>${r.bar_ist}</td>
       <td>${r.stance || '—'}</td>
+      <td style="${closeCls}">${closePct != null ? (closePct >= 0 ? '+' : '') + closePct.toFixed(2) + '%' : '—'}</td>
       <td>${r.mfe_pct != null ? '+' + r.mfe_pct.toFixed(2) + '%' : '—'}</td>
-      <td style="${t1Cls}">${r.t1_pct != null ? r.t1_pct.toFixed(2) + '%' : '—'}</td>
-      <td style="${t0Cls}">${r.lock_pct != null ? r.lock_pct.toFixed(2) + '%' : '—'}</td>
-      <td style="${s0Cls}">${r.ceil_pct != null ? '+' + r.ceil_pct.toFixed(2) + '%' : '—'}${ct ? ` (${ct})` : ''}</td>
+      <td style="${t1Cls}">${t1Show}</td>
+      <td style="${t0Cls}">${t0Show}</td>
+      <td style="${s0Cls}">${r.ceil_pct != null ? r.ceil_pct.toFixed(2) + '%' : '—'}${ct ? ` ×${ct}` : ''}</td>
       <td style="max-width:260px;word-break:break-word">${r.rationale || '—'}</td>
     </tr>`;
   }).join('');
   inner.innerHTML = exitSummary + t1Note + `<table class="fm-detail-table">
-    <thead><tr><th>Time</th><th>Stance</th><th>MFE%</th><th>T1</th><th>T0</th><th>S0</th><th>Rationale</th></tr></thead>
+    <thead><tr><th>Time</th><th>Stance</th><th>Close%</th><th>MFE%</th><th>T1</th><th>T0</th><th>S0</th><th>Rationale</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
 }
@@ -2557,17 +2639,24 @@ async function toggleFmTrail() {
       document.getElementById('fm-trail-empty').style.display = 'block';
       return;
     }
-    document.getElementById('fm-trail-rows').innerHTML = rows.map(r => `
-      <tr style="border-bottom:1px solid var(--hair)">
+    const modalEp = t.entry_price || 0;
+    document.getElementById('fm-trail-rows').innerHTML = rows.map(r => {
+      const closePct = (modalEp && r.price) ? (modalEp - r.price) / modalEp * 100 : null;
+      const closeCls = closePct == null ? '' : closePct >= 0 ? 'color:var(--pos)' : 'color:var(--neg)';
+      const t1Show = r.t1_pct != null ? Math.abs(r.t1_pct).toFixed(2)+'%' : '—';
+      const t0Show = r.lock_pct != null ? Math.abs(r.lock_pct).toFixed(2)+'%' : '—';
+      return `<tr style="border-bottom:1px solid var(--hair)">
         <td style="padding:4px 6px;white-space:nowrap">${r.bar_ist || '—'}</td>
         <td style="padding:4px 6px;white-space:nowrap;font-weight:700;${stanceColor(r.stance)}">${r.stance || '—'}</td>
+        <td style="padding:4px 6px;text-align:right;${closeCls}">${closePct != null ? (closePct>=0?'+':'')+closePct.toFixed(2)+'%' : '—'}</td>
         <td style="padding:4px 6px;text-align:right">${r.mfe_pct != null ? r.mfe_pct.toFixed(2)+'%' : '—'}</td>
-        <td style="padding:4px 6px;text-align:right;${r.t1_pct!=null?'color:var(--pos);font-weight:700':''}">${r.t1_pct != null ? r.t1_pct.toFixed(2)+'%' : '—'}</td>
-        <td style="padding:4px 6px;text-align:right">${r.lock_pct != null ? r.lock_pct.toFixed(2)+'%' : '—'}</td>
+        <td style="padding:4px 6px;text-align:right;${r.t1_pct!=null?'color:var(--pos);font-weight:700':''}">${t1Show}</td>
+        <td style="padding:4px 6px;text-align:right">${t0Show}</td>
         <td style="padding:4px 6px;text-align:right">${r.ceil_pct != null ? r.ceil_pct.toFixed(2)+'%' : '—'}</td>
         <td style="padding:4px 6px;text-align:right">${r.confidence != null ? Math.round(r.confidence) : '—'}</td>
         <td style="padding:4px 6px;color:var(--g)">${r.rationale || '—'}</td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
     document.getElementById('fm-trail-table').style.display = 'table';
   } catch(e) {
     document.getElementById('fm-trail-loading').textContent = 'Failed to load FM trail.';
