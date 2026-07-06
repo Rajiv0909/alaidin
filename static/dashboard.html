@@ -635,7 +635,7 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
         <table>
           <thead><tr>
             <th>Date</th><th>Symbol</th><th>Strategy</th>
-            <th>Dir</th><th>Entry</th><th>Exit</th>
+            <th>Entry</th><th>Exit</th>
             <th>P&L</th><th>Charges</th><th>Net P&L</th><th>Capital</th>
             <th title="Take-profit resting order">T1</th><th title="Profit lock level">T0</th><th title="Loss ceiling">S0</th><th title="Hard stop">S1</th>
           </tr></thead>
@@ -645,7 +645,7 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
       <div id="hist-live-section" style="overflow-x:auto">
         <table>
           <thead><tr>
-            <th>Symbol</th><th>Strategy</th><th>Dir</th>
+            <th>Symbol</th><th>Strategy</th>
             <th>Entry</th><th>Unrealized</th><th>MFE</th><th>Capital</th><th title="Take-profit resting order">T1</th><th title="Profit lock level">T0</th><th title="Loss ceiling">S0</th><th title="Hard stop">S1</th>
           </tr></thead>
           <tbody id="hist-live-body"></tbody>
@@ -1822,8 +1822,7 @@ function renderHistLive() {
 
     rows.push(`<tr class="row ${rowCls}${isScaled ? ' capital-scaled' : ''}" data-tdk="${tdk}" data-sym="${p.symbol}" data-sid="${p.strategy_id}">
       <td><strong>${p.symbol || '—'}</strong>${scaleBadge}${entryTime ? `<br><span style="font-size:10px;color:#bbb;font-weight:400">${entryTime}</span>` : ''}</td>
-      <td style="color:var(--g);font-size:12px">${fmtStratName(p.strategy_id)}${isPviEod ? ' <span style="font-size:9px;font-weight:700;padding:1px 4px;background:rgba(245,158,11,.15);color:#92400e;border-radius:2px;border:1px solid #fde68a">EOD</span>' : ''}</td>
-      <td><span class="badge badge-${dir.toLowerCase()}">${dir}</span></td>
+      <td style="color:var(--g);font-size:12px;background:${dir.toLowerCase() === 'long' ? 'rgba(22,163,74,.10)' : dir.toLowerCase() === 'short' ? 'rgba(220,38,38,.10)' : 'transparent'}" title="${dir}">${fmtStratName(p.strategy_id)}${isPviEod ? ' <span style="font-size:9px;font-weight:700;padding:1px 4px;background:rgba(245,158,11,.15);color:#92400e;border-radius:2px;border:1px solid #fde68a">EOD</span>' : ''}</td>
       <td>₹${isPvi && _entryShadowLatest[p.symbol]
         ? fmtEntryPair(_entryShadowLatest[p.symbol].esc_entry_price, _entryShadowLatest[p.symbol].tranche_entry_price)
         : fmtNum(p.entry_price)}</td>
@@ -1834,7 +1833,7 @@ function renderHistLive() {
     </tr>`);
     // Detail expansion row (hidden by default)
     rows.push(`<tr class="fm-detail-row" id="fmdet-${tdk}" style="display:none">
-      <td colspan="11"><div class="fm-detail-inner" id="fmdet-inner-${tdk}"><div style="color:#bbb;font-size:11px">Loading…</div></div></td>
+      <td colspan="10"><div class="fm-detail-inner" id="fmdet-inner-${tdk}"><div style="color:#bbb;font-size:11px">Loading…</div></div></td>
     </tr>`);
   });
   tbody.innerHTML = rows.join('');
@@ -2171,11 +2170,11 @@ function renderTrades(trades) {
     } else {
       t1Cell = t0Cell = s0Cell = s1Cell = blankLvl;
     }
+    const dirBg = dir.toLowerCase() === 'long' ? 'rgba(22,163,74,.10)' : dir.toLowerCase() === 'short' ? 'rgba(220,38,38,.10)' : 'transparent';
     allRows.push(`<tr class="row${isScaled ? ' capital-scaled' : ''}${isNoFill ? ' row-no-fill' : ''}" data-tdk="${tdk2}"${isNoFill ? ' style="opacity:.55"' : ''}>
       <td>${dateCell}</td>
       <td><strong>${t.symbol || '—'}</strong>${scaleBadge}${retryBadge}</td>
-      <td style="color:var(--g);font-size:12px">${fmtStratName(t.strategy_id)}</td>
-      <td><span class="badge badge-${dir.toLowerCase()}">${dir}</span></td>
+      <td style="color:var(--g);font-size:12px;background:${dirBg}" title="${dir}">${fmtStratName(t.strategy_id)}</td>
       <td>${ep}</td>
       <td>${xp}</td>
       <td>${gross}</td>
@@ -2186,7 +2185,7 @@ function renderTrades(trades) {
     </tr>`);
     if (isPviClosed) {
       allRows.push(`<tr class="fm-detail-row" id="fmdet-c-${tdk2}" style="display:none">
-        <td colspan="14"><div class="fm-detail-inner" id="fmdet-c-inner-${tdk2}"><div style="color:#bbb;font-size:11px">Loading…</div></div></td>
+        <td colspan="13"><div class="fm-detail-inner" id="fmdet-c-inner-${tdk2}"><div style="color:#bbb;font-size:11px">Loading…</div></div></td>
       </tr>`);
     }
   });
@@ -2744,7 +2743,7 @@ function _collapseRetries(trades) {
       out.push({ ...cluster[cluster.length - 1], _attempts: cluster.length });
     }
   });
-  out.sort((a, b) => new Date(a.exit_time) - new Date(b.exit_time));
+  out.sort((a, b) => new Date(b.exit_time) - new Date(a.exit_time));
   return out;
 }
 
