@@ -636,7 +636,7 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
           <thead><tr>
             <th>Date</th><th>Symbol</th><th>Strategy</th>
             <th>Dir</th><th>Entry</th><th>Exit</th>
-            <th>P&L</th><th>Charges</th><th>Net P&L</th><th>Exit Type</th><th>Capital</th><th>Agent</th>
+            <th>P&L</th><th>Charges</th><th>Net P&L</th><th>Exit Type</th><th>Capital</th>
           </tr></thead>
           <tbody id="hist-body"></tbody>
         </table>
@@ -785,6 +785,8 @@ let _dataSource       = 'total';  // 'total' | 'kite' (today only)
 let _livePositions    = [];       // cache for live view in history
 let _closedTrades     = [];       // cache for timeline re-render on tile click
 let _fmLatest         = {};       // latest FM cycle per symbol {symbol: {lock_pct,ceil_pct,mfe_pct,stance}}
+let _fmEodLatest      = {};       // latest PVI_EOD FM decision per symbol {symbol: {trail_retrace_pct,take_profit_pct,loss_ceiling_pct,mfe_pct,...}}
+let _entryShadowLatest = {};      // ESC-vs-tranche entry comparison per symbol {symbol: {esc_entry_price,tranche_entry_price}}
 const _tradeRows      = {};       // data-tdk → trade object (avoids JSON in onclick attrs)
 let _pnlData          = null;
 let _equityChart      = null;
@@ -1157,19 +1159,21 @@ async function refreshObsStrategies() {
       liveHtml = `<div class="obs-pos-section"><div class="obs-no-pos">Loading positions…</div></div>`;
     }
 
-    const myDone = closed.filter(t => t.strategy_id === sid);
+    const myDone = _collapseRetries(closed.filter(t => t.strategy_id === sid));
     let closedHtml = '';
     if (myDone.length) {
       const rows2 = myDone.map(t => {
         const pnlCls = t.pnl_rupees >= 0 ? 'green' : 'red';
         const exitT  = t.exit_time ? new Date(t.exit_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Kolkata'}) : '—';
+        const pnlPct = t.pnl_pct != null ? `<span style="font-size:10px;font-weight:400;opacity:.8"> (${t.pnl_pct>=0?'+':''}${Number(t.pnl_pct).toFixed(2)}%)</span>` : '';
+        const exitTypeStyle = t._attempts > 1 ? 'color:#b45309;font-weight:700' : 'color:var(--g)';
         return `<tr>
           <td style="text-align:left">${t.symbol}</td>
           <td>${exitT}</td>
           <td>${fmtRs(t.entry_price)}</td>
           <td>${fmtRs(t.exit_price)}</td>
-          <td class="${pnlCls}" style="font-weight:700">${(t.pnl_rupees>=0?'+':'')+fmtRs(t.pnl_rupees)}</td>
-          <td style="color:var(--g);font-size:10px">${(t.exit_type||'').replace(/_/g,' ')}</td>
+          <td class="${pnlCls}" style="font-weight:700">${(t.pnl_rupees>=0?'+':'')+fmtRs(t.pnl_rupees)}${pnlPct}</td>
+          <td style="${exitTypeStyle};font-size:10px" title="${t._attempts > 1 ? t._attempts + ' entry attempts before this outcome' : ''}">${_exitTypeLabel(t)}</td>
         </tr>`;
       }).join('');
       closedHtml = `
@@ -1395,40 +1399,6 @@ function renderKiteLive(positions) {
   }).join('');
 }
 
-function renderKiteHistory(closed) {
-  const tbody = document.getElementById('hist-body');
-  const empty = document.getElementById('hist-empty');
-  if (!closed.length) {
-    tbody.innerHTML = '';
-    empty.style.display = 'block';
-    return;
-  }
-  empty.style.display = 'none';
-  tbody.innerHTML = closed.map(p => {
-    const gross = p.gross_pnl || 0;
-    const col   = gross >= 0 ? 'var(--green)' : 'var(--red)';
-    const dir   = p.direction || (p.sell_qty > p.buy_qty ? 'SHORT' : 'LONG');
-    const cap   = p.capital ? '₹' + fmtNum(p.capital) : '—';
-    const typeTag = p.is_overnight
-      ? '<span style="font-size:10px;color:#f0a500;margin-left:4px">CNC</span>'
-      : '';
-    const dateLabel = p.trade_date || 'today';
-    return `<tr>
-      <td>${dateLabel}</td>
-      <td><strong>${p.symbol}</strong>${typeTag}</td>
-      <td>${fmtStratName(p.strategy_id || '?')}</td>
-      <td><span class="badge badge-${dir.toLowerCase()}">${dir}</span></td>
-      <td>₹${fmtNum(p.entry_price || 0)}</td>
-      <td>₹${fmtNum(p.exit_price || 0)}</td>
-      <td style="color:${col};font-weight:600">${fmtRs(gross)}</td>
-      <td style="color:#888">${cap}</td>
-      <td style="color:#888">Kite</td>
-      <td>${p.product || '—'}</td>
-    </tr>`;
-  }).join('');
-  document.getElementById('hist-pagination').style.display = 'none';
-}
-
 // ── Data fetchers ─────────────────────────────────────────────────────────
 async function fetchJson(url, opts) {
   const r = await fetch(url, opts);
@@ -1598,8 +1568,7 @@ async function refreshKitePnl() {
   // Live positions: use Kite's open positions
   renderKiteLive(d.open || []);
 
-  // Trade history: use Kite's closed positions
-  renderKiteHistory(d.closed || []);
+  // Trade history table is owned by refreshHistory()/renderTrades — not duplicated here.
 }
 
 async function refreshEquity() {
@@ -1771,6 +1740,17 @@ function renderHistLive() {
     const scaleBadge = isScaled ? '<span class="scale-badge">×</span>' : '';
     const isShadow = (p.metadata?.shadow || (p.strategy_id||'').includes('SHADOW'));
     const isPviEod = p.strategy_id === 'PVI_EOD';
+    // Actual invested vs system-intended capital_deployed — same ELEVATED
+    // STAKES logic as pvi_eod_flow_manager.py's SIZING block (lines 551-566):
+    // >15% over cap, OR any recorded add-on, either source is enough to flag.
+    const invested   = (p.entry_qty || 0) * (p.entry_price || 0);
+    const addonLog   = meta.addon_log || meta._d1_add_log || [];
+    const nAddons    = addonLog.filter(e => e.qty || e.add_qty).length;
+    const elevated   = isPviEod && p.entry_qty &&
+                        ((p.capital_deployed > 0 && invested > p.capital_deployed * 1.15) || nAddons > 0);
+    const investedTxt = (isPviEod && p.entry_qty)
+      ? `<br><span style="font-size:10px;color:${elevated ? '#92400e' : '#bbb'};font-weight:${elevated ? '700' : '400'}">inv ${fmtK(invested)}${elevated ? ' <span class="scale-badge">ELEVATED</span>' : ''}</span>`
+      : '';
     const rowCls = isShadow ? 'pos-shadow' : isPviEod ? 'pos-eod' : 'pos-live';
 
     const isPvi = p.strategy_id === 'PVI';
@@ -1822,11 +1802,36 @@ function renderHistLive() {
       }
 
     } else if (isPviEod) {
-      // PVI_EOD: show only what strategy publishes; S1 = hard stop abs %
-      // T1/T0/S0 left blank until strategy adds them (user will align labels in code)
+      // PVI_EOD (LONG): S1 = hard stop abs % below entry, unchanged/fixed.
       const stopPct = (p.stop_price && p.entry_price)
         ? Math.abs((p.stop_price - p.entry_price) / p.entry_price * 100) : null;
       s1Td = `<td class="lvl-td lc-def">${stopPct != null ? stopPct.toFixed(1) + '%' : '—'}</td>`;
+
+      const fmEod = _fmEodLatest[p.symbol];
+      if (fmEod) {
+        // T1: take_profit_pct — stored positive (% above entry), null until armed.
+        const t1Armed = fmEod.take_profit_pct != null;
+        t1Td = `<td class="lvl-td ${t1Armed ? 'lc-active' : 'lc-def'}" title="${t1Armed ? 'FM armed' : 'Not armed yet'}">` +
+               `${t1Armed ? fmEod.take_profit_pct.toFixed(2) + '%' : '—'}</td>`;
+
+        // T0: trail_retrace_pct is a WIDTH below the high-water mark, not a
+        // direct distance from entry — convert using mfe_pct from the same
+        // log entry (mfe_pct − retrace = actual trail distance from entry;
+        // negative means the trail still sits below entry, i.e. not yet
+        // protecting profit).
+        const hasT0 = fmEod.trail_retrace_pct != null && fmEod.mfe_pct != null;
+        const t0FromEntry = hasT0 ? (fmEod.mfe_pct - fmEod.trail_retrace_pct) : null;
+        t0Td = `<td class="lvl-td ${hasT0 ? 'lc-active' : 'lc-def'}" title="retrace width ${fmEod.trail_retrace_pct != null ? fmEod.trail_retrace_pct.toFixed(2) + '%' : '—'} off MFE ${fmEod.mfe_pct != null ? fmEod.mfe_pct.toFixed(2) + '%' : '—'}">` +
+               `${t0FromEntry != null ? (t0FromEntry >= 0 ? '+' : '') + t0FromEntry.toFixed(2) + '%' : '—'}</td>`;
+
+        // S0: loss_ceiling_pct — stored negative (% below entry); show as
+        // signed distance below entry, blank until the FM has armed one.
+        const s0Armed = fmEod.loss_ceiling_pct != null;
+        s0Td = `<td class="lvl-td ${s0Armed ? 'lc-warn' : 'lc-def'}">` +
+               `${s0Armed ? fmEod.loss_ceiling_pct.toFixed(2) + '%' : '—'}</td>`;
+
+        if (fmEod.mfe_pct != null) mfeTxt = `<span style="color:var(--pos);font-size:11px">+${fmEod.mfe_pct.toFixed(2)}%</span>`;
+      }
 
     } else {
       // Other strategies: S1 = stop abs%, T1 = agent chip
@@ -1843,10 +1848,12 @@ function renderHistLive() {
       <td><strong>${p.symbol || '—'}</strong>${scaleBadge}${entryTime ? `<br><span style="font-size:10px;color:#bbb;font-weight:400">${entryTime}</span>` : ''}</td>
       <td style="color:var(--g);font-size:12px">${fmtStratName(p.strategy_id)}${isPviEod ? ' <span style="font-size:9px;font-weight:700;padding:1px 4px;background:rgba(245,158,11,.15);color:#92400e;border-radius:2px;border:1px solid #fde68a">EOD</span>' : ''}</td>
       <td><span class="badge badge-${dir.toLowerCase()}">${dir}</span></td>
-      <td>₹${fmtNum(p.entry_price)}</td>
+      <td>₹${isPvi && _entryShadowLatest[p.symbol]
+        ? fmtEntryPair(_entryShadowLatest[p.symbol].esc_entry_price, _entryShadowLatest[p.symbol].tranche_entry_price)
+        : fmtNum(p.entry_price)}</td>
       <td class="${unrlCls}" style="font-weight:700">${unrlTxt}</td>
       <td>${mfeTxt}</td>
-      <td style="color:var(--g)">${capTxt}</td>
+      <td style="color:var(--g)">${capTxt}${investedTxt}</td>
       ${t1Td}${t0Td}${s0Td}${s1Td}
     </tr>`);
     // Detail expansion row (hidden by default)
@@ -2052,6 +2059,14 @@ async function refreshLive() {
     const fm = await fetchJson('/api/pvi/fm-latest');
     _fmLatest = fm.data || {};
   } catch(_) { _fmLatest = {}; }
+  try {
+    const fmEod = await fetchJson('/api/pvi_eod/fm-latest');
+    _fmEodLatest = fmEod.data || {};
+  } catch(_) { _fmEodLatest = {}; }
+  try {
+    const es = await fetchJson('/api/pvi/entry-shadow-latest');
+    _entryShadowLatest = es.data || {};
+  } catch(_) { _entryShadowLatest = {}; }
   const cap = d.capital || {};
 
   const curr = cap.sub_current_allocated;
@@ -2091,7 +2106,9 @@ async function refreshLive() {
 }
 
 async function refreshHistory() {
-  if (_dataSource === 'kite' && _selectedPeriod === 'today') return;
+  // Trade-history table always renders from trades_v2 (renderTrades), regardless of
+  // the Kite/Total KPI toggle — Kite fill prices match trades_v2 pnl_rupees exactly,
+  // and having a single render path avoids two functions racing to write #hist-body.
 
   // Today: show live+closed for the day (no pagination needed)
   if (_selectedPeriod === 'today') {
@@ -2120,6 +2137,7 @@ async function refreshHistory() {
 }
 
 function renderTrades(trades) {
+  trades = _collapseRetries(trades);
   const tbody = document.getElementById('hist-body');
   const empty = document.getElementById('hist-empty');
 
@@ -2151,39 +2169,42 @@ function renderTrades(trades) {
     }
     const isNoFill = t.fill_status === 'NO_FILL' || t.exit_type === 'NO_FILL';
     const gross = isNoFill ? '—' : (t.gross_pnl_rs != null ? fmtRs(t.gross_pnl_rs) : '—');
+    const grossPct = (!isNoFill && t.pnl_pct != null)
+      ? `<span style="font-size:10px;font-weight:400;opacity:.8"> (${t.pnl_pct>=0?'+':''}${Number(t.pnl_pct).toFixed(2)}%)</span>` : '';
     const chg   = isNoFill ? '—' : (t.charges_rs   != null ? '₹' + fmtNum(t.charges_rs) : '—');
     const net   = isNoFill ? '—' : (t.net_pnl_rs   != null ? fmtRs(t.net_pnl_rs) : '—');
     const netCls= isNoFill ? '' : (t.net_pnl_rs   != null ? (t.net_pnl_rs >= 0 ? 'green' : 'red') : '');
     const dir   = t.direction || '';
-    const ep    = t.entry_price ? '₹' + fmtNum(t.entry_price) : '—';
+    const entryShadow = isPviClosed ? _entryShadowLatest[t.symbol] : null;
+    const ep    = entryShadow
+      ? '₹' + fmtEntryPair(entryShadow.esc_entry_price, entryShadow.tranche_entry_price)
+      : (t.entry_price ? '₹' + fmtNum(t.entry_price) : '—');
     const xp    = isNoFill ? '—' : (t.exit_price  ? '₹' + fmtNum(t.exit_price)  : '—');
     const meta  = t.metadata || {};
     const isScaled = (meta.nifty_intra_scale != null && meta.nifty_intra_scale !== 1.0) ||
                      (meta.presignal_scale    != null && meta.presignal_scale    !== 1.0);
     const capTxt    = t.capital_deployed ? fmtK(t.capital_deployed) : '—';
     const scaleBadge = isScaled ? '<span class="scale-badge">×</span>' : '';
-    const agentRaw  = t.agent_approved_by || '';
-    const agentTxt  = (agentRaw && agentRaw !== 'RULE_BASED')
-      ? `<span class="agent-chip">${agentRaw.replace('pvi_entry_agent_','v').replace(/_agent$/,'')}</span>` : '—';
+    const retryBadge = t._attempts > 1
+      ? `<span style="font-size:10px;font-weight:700;color:#b45309;margin-left:4px" title="${t._attempts} entry attempts before this outcome">↻${t._attempts}</span>` : '';
     const exitCell = isPviClosed ? pviClosedLevels(t)
       : (isNoFill ? `<span class="exit-badge" style="background:#444;color:#bbb">NEVER FILLED</span>` : exitBadge(t.exit_type, meta));
     allRows.push(`<tr class="row${isScaled ? ' capital-scaled' : ''}${isNoFill ? ' row-no-fill' : ''}" data-tdk="${tdk2}"${isNoFill ? ' style="opacity:.55"' : ''}>
       <td>${dateCell}</td>
-      <td><strong>${t.symbol || '—'}</strong>${scaleBadge}</td>
+      <td><strong>${t.symbol || '—'}</strong>${scaleBadge}${retryBadge}</td>
       <td style="color:var(--g);font-size:12px">${fmtStratName(t.strategy_id)}</td>
       <td><span class="badge badge-${dir.toLowerCase()}">${dir}</span></td>
       <td>${ep}</td>
       <td>${xp}</td>
-      <td>${gross}</td>
+      <td>${gross}${grossPct}</td>
       <td style="color:var(--g)">${chg}</td>
       <td class="${netCls}" style="font-weight:700">${net}</td>
       <td>${exitCell}</td>
       <td style="color:var(--g)">${capTxt}</td>
-      <td>${agentTxt}</td>
     </tr>`);
     if (isPviClosed) {
       allRows.push(`<tr class="fm-detail-row" id="fmdet-c-${tdk2}" style="display:none">
-        <td colspan="12"><div class="fm-detail-inner" id="fmdet-c-inner-${tdk2}"><div style="color:#bbb;font-size:11px">Loading…</div></div></td>
+        <td colspan="11"><div class="fm-detail-inner" id="fmdet-c-inner-${tdk2}"><div style="color:#bbb;font-size:11px">Loading…</div></div></td>
       </tr>`);
     }
   });
@@ -2700,9 +2721,54 @@ function fmtRs(v) {
   return sign + '₹' + fmtNum(Math.abs(v));
 }
 
+// ESC (real) vs tranche (shadow, pure observation) entry price comparison for PVI —
+// see project_pvi_recovery_short_hypothesis memory. '-' on either side means
+// that side isn't available (ESC never filled, or tranche schedule never resolved).
+function fmtEntryPair(escPrice, tranchePrice) {
+  const esc = escPrice != null ? fmtNum(escPrice) : '-';
+  const tr  = tranchePrice != null ? fmtNum(tranchePrice) : '-';
+  return `${esc}/${tr}`;
+}
+
 function fmtK(v) {
   if (!v) return '—';
   return '₹' + Math.round(v / 1000) + 'K';
+}
+
+// Collapse repeated NO_FILL entry attempts (same symbol re-signaling every cycle
+// until it either fills or gives up) into a single row/dot. A NO_FILL streak that's
+// followed by a real fill attaches its count to that fill's row; a streak that never
+// fills becomes one "NO_FILL ×N" row. Legitimately separate real trades on the same
+// symbol same day (PVI allows re-entry) are untouched — only adjacent NO_FILLs merge.
+function _collapseRetries(trades) {
+  const bySymbol = {};
+  trades.forEach(t => {
+    const key = t.symbol + '|' + (t.strategy_id || '');
+    (bySymbol[key] = bySymbol[key] || []).push(t);
+  });
+  const out = [];
+  Object.values(bySymbol).forEach(arr => {
+    arr.sort((a, b) => new Date(a.entry_time) - new Date(b.entry_time));
+    let cluster = [];
+    arr.forEach(t => {
+      if (t.exit_type === 'NO_FILL') {
+        cluster.push(t);
+      } else {
+        out.push(cluster.length ? { ...t, _attempts: cluster.length + 1 } : t);
+        cluster = [];
+      }
+    });
+    if (cluster.length) {
+      out.push({ ...cluster[cluster.length - 1], _attempts: cluster.length });
+    }
+  });
+  out.sort((a, b) => new Date(a.exit_time) - new Date(b.exit_time));
+  return out;
+}
+
+function _exitTypeLabel(t) {
+  const base = (t.exit_type || '').replace(/_/g, ' ');
+  return t._attempts > 1 ? `${base} ×${t._attempts}` : base;
 }
 
 function logout() {
@@ -2837,6 +2903,10 @@ function selectStratTile(stratId, el) {
 // ── Intraday trade timeline ───────────────────────────────────────────────
 const _TL = { left: 52, right: 16, top: 12, niftyH: 210 };
 _TL.width = 880 - _TL.left - _TL.right;
+// Mirrors strategies/pvi_spec.py PVISpec.max_up_caution_pct — the live dimension-2
+// regime gate (peak NIFTY move from open, not net drift) that halves PVI position
+// size once breached. Update this if that spec value changes.
+const _TL_CAUTION_PCT = 0.90;
 
 function _tlToX(timeStr) {
   const [h, m] = timeStr.split(':').map(Number);
@@ -2894,8 +2964,8 @@ async function renderIntradayTimeline(trades) {
   const allTrades = trades || [];
   const stratTrades = _selectedStrategy ? allTrades.filter(t => t.strategy_id === _selectedStrategy) : allTrades;
   // Only show trades that exited today (IST) — prevents prior-session bleeds
-  const todayTrades = stratTrades.filter(t => t.entry_time && t.exit_time &&
-    new Date(t.exit_time).toLocaleDateString('en-CA', {timeZone:'Asia/Kolkata'}) === _tlTodayIST);
+  const todayTrades = _collapseRetries(stratTrades.filter(t => t.entry_time && t.exit_time &&
+    new Date(t.exit_time).toLocaleDateString('en-CA', {timeZone:'Asia/Kolkata'}) === _tlTodayIST));
 
   if (!todayTrades.length) {
     svg.innerHTML = `<text x="440" y="120" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="13" fill="#bbb">No closed trades today — timeline will populate during trading hours.</text>`;
@@ -2903,8 +2973,44 @@ async function renderIntradayTimeline(trades) {
   }
 
   const pcts = niftyData.map(d => d.pct);
-  const minP = Math.min(...pcts), maxP = Math.max(...pcts);
+  // Scale strictly to actual data (+ zero) — do not stretch the range to force the
+  // caution threshold into view. If NIFTY never gets near it, the band just won't render.
+  const minP = Math.min(...pcts, 0);
+  const maxP = Math.max(...pcts, 0);
   const zeroY = _tlNiftyY(0, minP, maxP);
+
+  // Running peak-from-open (dimension-2 CAUTION trigger only grows through the day —
+  // once breached it stays breached, so shade from first-breach time to session end).
+  let _runningMax = -Infinity, _breachTime = null;
+  for (const d of niftyData) {
+    _runningMax = Math.max(_runningMax, d.pct);
+    if (_breachTime === null && _runningMax >= _TL_CAUTION_PCT) _breachTime = d.time;
+  }
+  const cautionHtml = _breachTime ? (() => {
+    const bx = _tlToX(_breachTime);
+    const rx = _TL.left + _TL.width;
+    return `
+      <rect x="${bx}" y="${_TL.top}" width="${Math.max(rx - bx, 0)}" height="${_TL.niftyH}"
+            fill="rgba(217,119,6,0.08)"/>
+      <line x1="${bx}" y1="${_TL.top}" x2="${bx}" y2="${_TL.top + _TL.niftyH}"
+            stroke="#d97706" stroke-width="1" stroke-dasharray="3,2"/>
+      <text x="${bx + 4}" y="${_TL.top + 11}" font-size="9" font-weight="700" fill="#b45309">CAUTION (peak ≥${_TL_CAUTION_PCT}% from open)</text>`;
+  })() : '';
+
+  // Y-axis gridlines at a "nice" step so any level (e.g. 0.5%) can be read off directly.
+  const _rawRange = Math.max(maxP - minP, 0.5);
+  const _niceSteps = [0.1, 0.25, 0.5, 1, 2];
+  const _tickStep = _niceSteps.find(s => _rawRange / s <= 6) || 5;
+  const _tickStart = Math.ceil(minP / _tickStep) * _tickStep;
+  const gridTicks = [];
+  for (let v = _tickStart; v <= maxP + 1e-9; v += _tickStep) gridTicks.push(Math.round(v * 100) / 100);
+  const gridHtml = gridTicks.map(v => {
+    const y = _tlNiftyY(v, minP, maxP);
+    const isZero = Math.abs(v) < 1e-9;
+    return `
+      <line x1="${_TL.left}" y1="${y}" x2="${_TL.left + _TL.width}" y2="${y}" stroke="${isZero ? '#ccc' : '#eee'}" stroke-width="1" ${isZero ? 'stroke-dasharray="4,3"' : ''}/>
+      <text x="${_TL.left - 4}" y="${y + 3}" text-anchor="end" font-size="10" fill="${isZero ? '#999' : '#bbb'}" font-weight="${isZero ? '700' : '400'}">${v >= 0 ? '+' : ''}${v.toFixed(_tickStep < 1 ? 2 : 0)}%</text>`;
+  }).join('');
 
   // Nifty line — fill anchored at zero line (open = 0%), colored by direction
   const niftyPts = niftyData.map(d => `${_tlToX(d.time)},${_tlNiftyY(d.pct, minP, maxP)}`).join(' ');
@@ -2932,30 +3038,25 @@ async function renderIntradayTimeline(trades) {
     const cy  = _tlNiftyY(_tlNiftyPct(eT, niftyData), minP, maxP);
     const profit = (t.net_pnl_rs != null ? t.net_pnl_rs : (t.pnl_rupees || 0)) >= 0;
     const col  = profit ? '#16a34a' : '#dc2626';
-    const label = (isOvernight ? '⟳' : '') + (t.symbol || '');
+    const retried = t._attempts > 1;
+    const label = (isOvernight ? '⟳' : '') + (t.symbol || '') + (retried ? ` ×${t._attempts}` : '');
     const pnlTxt = t.net_pnl_rs != null ? (t.net_pnl_rs >= 0 ? '+₹' : '-₹') + Math.abs(Math.round(t.net_pnl_rs)) : '';
+    const titleTxt = `${(t.symbol||'')}${pnlTxt ? ' ' + pnlTxt : ''}${retried ? ` — ${t._attempts} entry attempts` : ''}`;
     // Alternate label above/below to reduce overlap
     const labelY = (i % 2 === 0) ? cy - 11 : cy + 20;
     const labelAnchor = cx > _TL.left + _TL.width * 0.8 ? 'end' : 'start';
     dotsHtml += `<g>
-      <title>${label}${pnlTxt ? ' ' + pnlTxt : ''}</title>
-      <circle cx="${cx}" cy="${cy}" r="5" fill="${col}" stroke="var(--w)" stroke-width="1.5" opacity="0.9"/>
+      <title>${titleTxt}</title>
+      <circle cx="${cx}" cy="${cy}" r="${retried ? 6 : 5}" fill="${col}" stroke="${retried ? '#b45309' : 'var(--w)'}" stroke-width="${retried ? 2 : 1.5}" opacity="0.9"/>
       <text x="${cx}" y="${labelY}" font-size="11" fill="${col}" font-weight="700" text-anchor="${labelAnchor}">${label}</text>
     </g>`;
   });
 
-  // Y-axis pct labels (min, zero/open, max)
-  const yLabels = [minP, 0, maxP].filter((v,i,a) => a.indexOf(v) === i).map(p => {
-    const y = _tlNiftyY(p, minP, maxP);
-    const isZero = p === 0;
-    return `<text x="${_TL.left - 4}" y="${y + 4}" text-anchor="end" font-size="10" fill="${isZero ? '#999' : '#bbb'}" font-weight="${isZero ? '700' : '400'}">${p >= 0 ? '+' : ''}${p.toFixed(2)}%</text>`;
-  }).join('');
-
   svg.innerHTML = `
+    ${cautionHtml}
     <polygon points="${fillPts}" fill="${fillColor}"/>
-    <line x1="${_TL.left}" y1="${zeroY}" x2="${_TL.left + _TL.width}" y2="${zeroY}" stroke="#ccc" stroke-width="1" stroke-dasharray="4,3"/>
+    ${gridHtml}
     <polyline points="${niftyPts}" fill="none" stroke="#111" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-    ${yLabels}
     <text x="${_TL.left + 4}" y="${_TL.top + 13}" font-size="10" font-weight="800" fill="#999" letter-spacing="1">NIFTY 50</text>
     ${dotsHtml}
     ${axisHtml}
