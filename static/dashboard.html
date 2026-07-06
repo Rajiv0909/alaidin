@@ -636,7 +636,7 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
           <thead><tr>
             <th>Date</th><th>Symbol</th><th>Strategy</th>
             <th>Dir</th><th>Entry</th><th>Exit</th>
-            <th>P&L</th><th>Charges</th><th>Net P&L</th><th>Exit Type</th><th>Capital</th>
+            <th>P&L</th><th>Charges</th><th>Net P&L</th><th>Capital</th>
             <th title="Take-profit resting order">T1</th><th title="Profit lock level">T0</th><th title="Loss ceiling">S0</th><th title="Hard stop">S1</th>
           </tr></thead>
           <tbody id="hist-body"></tbody>
@@ -1631,35 +1631,6 @@ function switchHistView(view) {
 
 function toggleTradeHistory() { /* no-op — always expanded */ }
 
-function _lvlBox(label, valTxt, cls) {
-  return `<div class="lvl-box ${cls}"><span class="lvl-label">${label}</span><span class="lvl-val">${valTxt}</span></div>`;
-}
-
-function exitBadge(exitType, meta) {
-  const t = (exitType || '').toUpperCase();
-  const isHiMom = meta && (meta.presignal_hi_mom === true || meta.presignal_hi_mom === 'true');
-  if (t === 'T1_PROFIT_CLOSE')    return `<span class="exit-badge exit-profit">T1</span>`;
-  if (t === 'T2')                  return `<span class="exit-badge exit-profit">T2</span>`;
-  if (t === 'PROFIT_LOCK_CLOSE')   return `<span class="exit-badge exit-profit">Lock</span>`;
-  if (['TARGET','TARGET_LEG1','TARGET_VWAP','VWAP_TAKE','VWAP_TRAIL'].includes(t))
-                                   return `<span class="exit-badge exit-profit">Tgt</span>`;
-  if (['FLOW_AGENT_EXIT','AGENT_EXIT','ML_EXIT','EXIT_ML','DS_EXIT_1MIN'].includes(t))
-                                   return `<span class="exit-badge exit-agent">Agent</span>`;
-  if (t === 'TICK_STOP')           return `<span class="exit-badge exit-loss">${isHiMom ? 'HM Stop' : 'Tick'}</span>`;
-  if (['STOP','T0_STOP','STOP_OBS','T1_STOP','T2_STOP','DS_STOP_BREACH',
-       'ADVERSE_TRAIL_BREACH','TRAILING_STOP'].includes(t))
-                                   return `<span class="exit-badge exit-loss">Stop</span>`;
-  if (t === 'LOSS_CEILING_CLOSE')  return `<span class="exit-badge exit-ceil">Ceil</span>`;
-  if (['STRUCTURAL_BREAK','ABSORPTION','SKIP_REDS_GATE'].includes(t))
-                                   return `<span class="exit-badge exit-ceil">${t==='ABSORPTION'?'Absorb':t==='SKIP_REDS_GATE'?'Skip':'Struct'}</span>`;
-  if (['CLOSE','EOD','EOD_STALE','TIMEOUT'].includes(t))
-                                   return `<span class="exit-badge exit-eod">EOD</span>`;
-  if (t === 'KITE_SYNC')           return `<span class="exit-badge exit-eod">Sync</span>`;
-  if (t === 'MANUAL')              return `<span class="exit-badge exit-eod">Manual</span>`;
-  if (t === 'GHOST_CLEANUP')       return `<span class="exit-badge exit-eod">Ghost</span>`;
-  return exitType ? `<span class="exit-badge exit-eod">${exitType}</span>` : '—';
-}
-
 function _exitBucket(exitType) {
   const t = (exitType || '').toUpperCase();
   if (['T1_PROFIT_CLOSE','T2'].includes(t))   return 'T1';
@@ -1674,24 +1645,19 @@ function _exitBucket(exitType) {
 
 // Closed-trade level cells for the history table — same 4 columns (T1/T0/S0/S1) as
 // the live table, values as plain <td> (no in-cell label; header carries the label),
-// with the bucket that was actually hit highlighted. Returns {badge, t1, t0, s0, s1}:
-// badge goes in the Exit Type column, t1..s1 are ready-to-use <td> strings.
+// with the bucket that was actually hit highlighted. Returns {t1, t0, s0, s1} —
+// ready-to-use <td> strings. EOD/MANUAL-bucketed exits show no highlighted column;
+// click the row to expand the FM trail for the actual reason.
 function pviClosedLevels(trade) {
-  const meta = trade.metadata || {};
   if (trade.fill_status === 'NO_FILL' || trade.exit_type === 'NO_FILL') {
-    const escN = meta.esc_cycle ? ` · ESC${meta.esc_cycle}` : '';
     const blank = '<td class="lvl-td lc-def">—</td>';
-    return {
-      badge: `<span class="exit-badge" style="background:#444;color:#bbb">NEVER FILLED${escN}</span>`,
-      t1: blank, t0: blank, s0: blank, s1: blank,
-    };
+    return { t1: blank, t0: blank, s0: blank, s1: blank };
   }
   const bucket = _exitBucket(trade.exit_type);
   const ep = trade.entry_price || 0;
   const xp = trade.exit_price;
   const sp = trade.stop_price;
   const tp = trade.target_price;
-  const isHiMom = meta.presignal_hi_mom === true || meta.presignal_hi_mom === 'true';
 
   // Actual pnl% at exit (PVI = SHORT: entry > exit = profit)
   const actualPct = (ep && xp) ? (ep - xp) / ep * 100 : (trade.pnl_pct ? parseFloat(trade.pnl_pct) : null);
@@ -1712,12 +1678,8 @@ function pviClosedLevels(trade) {
     : (stopAbs != null ? '+' + stopAbs.toFixed(1) + '%' : '—');
 
   const cellCls = hit => hit ? 'lvl-td lc-exit' : 'lvl-td lc-def';
-  const bucketLabel = { T1: 'T1', T0: 'T0', S0: 'S0', S1: isHiMom ? 'HM S1' : 'S1',
-                        EOD: 'EOD', MANUAL: 'Manual' }[bucket] || (trade.exit_type || '—');
-  const badgeCls = bucket === 'T1' || bucket === 'T0' ? 'exit-profit' : bucket === 'S0' || bucket === 'S1' ? 'exit-loss' : 'exit-eod';
 
   return {
-    badge: `<span class="exit-badge ${badgeCls}">${bucketLabel}</span>`,
     t1: `<td class="${cellCls(bucket === 'T1')}">${t1Val}</td>`,
     t0: `<td class="${cellCls(bucket === 'T0')}">${t0Val}</td>`,
     s0: `<td class="${cellCls(bucket === 'S0')}">${s0Val}</td>`,
@@ -2183,10 +2145,10 @@ function renderTrades(trades) {
     }
     const isNoFill = t.fill_status === 'NO_FILL' || t.exit_type === 'NO_FILL';
     const gross = isNoFill ? '—' : (t.gross_pnl_rs != null ? fmtRs(t.gross_pnl_rs) : '—');
-    const grossPct = (!isNoFill && t.pnl_pct != null)
-      ? `<span style="font-size:10px;font-weight:400;opacity:.8"> (${t.pnl_pct>=0?'+':''}${Number(t.pnl_pct).toFixed(2)}%)</span>` : '';
     const chg   = isNoFill ? '—' : (t.charges_rs   != null ? '₹' + fmtNum(t.charges_rs) : '—');
     const net   = isNoFill ? '—' : (t.net_pnl_rs   != null ? fmtRs(t.net_pnl_rs) : '—');
+    const netPct = (!isNoFill && t.pnl_pct != null)
+      ? `<span style="font-size:10px;font-weight:400;opacity:.8"> (${t.pnl_pct>=0?'+':''}${Number(t.pnl_pct).toFixed(2)}%)</span>` : '';
     const netCls= isNoFill ? '' : (t.net_pnl_rs   != null ? (t.net_pnl_rs >= 0 ? 'green' : 'red') : '');
     const dir   = t.direction || '';
     const entryShadow = isPviClosed ? _entryShadowLatest[t.symbol] : null;
@@ -2202,12 +2164,11 @@ function renderTrades(trades) {
     const retryBadge = t._attempts > 1
       ? `<span style="font-size:10px;font-weight:700;color:#b45309;margin-left:4px" title="${t._attempts} entry attempts before this outcome">↻${t._attempts}</span>` : '';
     const blankLvl = '<td class="lvl-td lc-def">—</td>';
-    let exitCell, t1Cell, t0Cell, s0Cell, s1Cell;
+    let t1Cell, t0Cell, s0Cell, s1Cell;
     if (isPviClosed) {
       const lv = pviClosedLevels(t);
-      exitCell = lv.badge; t1Cell = lv.t1; t0Cell = lv.t0; s0Cell = lv.s0; s1Cell = lv.s1;
+      t1Cell = lv.t1; t0Cell = lv.t0; s0Cell = lv.s0; s1Cell = lv.s1;
     } else {
-      exitCell = isNoFill ? `<span class="exit-badge" style="background:#444;color:#bbb">NEVER FILLED</span>` : exitBadge(t.exit_type, meta);
       t1Cell = t0Cell = s0Cell = s1Cell = blankLvl;
     }
     allRows.push(`<tr class="row${isScaled ? ' capital-scaled' : ''}${isNoFill ? ' row-no-fill' : ''}" data-tdk="${tdk2}"${isNoFill ? ' style="opacity:.55"' : ''}>
@@ -2217,16 +2178,15 @@ function renderTrades(trades) {
       <td><span class="badge badge-${dir.toLowerCase()}">${dir}</span></td>
       <td>${ep}</td>
       <td>${xp}</td>
-      <td>${gross}${grossPct}</td>
+      <td>${gross}</td>
       <td style="color:var(--g)">${chg}</td>
-      <td class="${netCls}" style="font-weight:700">${net}</td>
-      <td>${exitCell}</td>
+      <td class="${netCls}" style="font-weight:700">${net}${netPct}</td>
       <td style="color:var(--g)">${capTxt}</td>
       ${t1Cell}${t0Cell}${s0Cell}${s1Cell}
     </tr>`);
     if (isPviClosed) {
       allRows.push(`<tr class="fm-detail-row" id="fmdet-c-${tdk2}" style="display:none">
-        <td colspan="15"><div class="fm-detail-inner" id="fmdet-c-inner-${tdk2}"><div style="color:#bbb;font-size:11px">Loading…</div></div></td>
+        <td colspan="14"><div class="fm-detail-inner" id="fmdet-c-inner-${tdk2}"><div style="color:#bbb;font-size:11px">Loading…</div></div></td>
       </tr>`);
     }
   });
