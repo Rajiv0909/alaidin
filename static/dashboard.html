@@ -637,6 +637,7 @@ footer { text-align: center; font-size: 10px; color: #bbb; padding: 20px; margin
             <th>Date</th><th>Symbol</th><th>Strategy</th>
             <th>Dir</th><th>Entry</th><th>Exit</th>
             <th>P&L</th><th>Charges</th><th>Net P&L</th><th>Exit Type</th><th>Capital</th>
+            <th title="Take-profit resting order">T1</th><th title="Profit lock level">T0</th><th title="Loss ceiling">S0</th><th title="Hard stop">S1</th>
           </tr></thead>
           <tbody id="hist-body"></tbody>
         </table>
@@ -1671,11 +1672,19 @@ function _exitBucket(exitType) {
   return null;
 }
 
+// Closed-trade level cells for the history table — same 4 columns (T1/T0/S0/S1) as
+// the live table, values as plain <td> (no in-cell label; header carries the label),
+// with the bucket that was actually hit highlighted. Returns {badge, t1, t0, s0, s1}:
+// badge goes in the Exit Type column, t1..s1 are ready-to-use <td> strings.
 function pviClosedLevels(trade) {
   const meta = trade.metadata || {};
   if (trade.fill_status === 'NO_FILL' || trade.exit_type === 'NO_FILL') {
     const escN = meta.esc_cycle ? ` · ESC${meta.esc_cycle}` : '';
-    return `<div class="lvl-boxes"><span class="exit-badge" style="background:#444;color:#bbb">NEVER FILLED${escN}</span></div>`;
+    const blank = '<td class="lvl-td lc-def">—</td>';
+    return {
+      badge: `<span class="exit-badge" style="background:#444;color:#bbb">NEVER FILLED${escN}</span>`,
+      t1: blank, t0: blank, s0: blank, s1: blank,
+    };
   }
   const bucket = _exitBucket(trade.exit_type);
   const ep = trade.entry_price || 0;
@@ -1690,7 +1699,7 @@ function pviClosedLevels(trade) {
   const t1InitAbs = (tp && ep) ? Math.abs((tp - ep) / ep * 100) : null;
   const stopAbs   = (sp && ep) ? (sp - ep) / ep * 100 : null;
 
-  // Triggered box shows actual pnl%; non-triggered profit boxes show initial ref
+  // Triggered cell shows actual pnl%; non-triggered profit cells show initial ref
   const t1Val  = bucket === 'T1' && actualPct != null
     ? (actualPct >= 0 ? '+' : '') + actualPct.toFixed(2) + '%'
     : (t1InitAbs != null ? t1InitAbs.toFixed(2) + '%' : '—');
@@ -1702,13 +1711,18 @@ function pviClosedLevels(trade) {
     ? actualPct.toFixed(2) + '%'
     : (stopAbs != null ? '+' + stopAbs.toFixed(1) + '%' : '—');
 
-  const t1Box   = _lvlBox('T1',                    t1Val, bucket === 'T1'              ? 'lvl-exit' : 'lvl-inactive');
-  const t0Box   = _lvlBox('T0',                    t0Val, bucket === 'T0'              ? 'lvl-exit' : 'lvl-inactive');
-  const s0Box   = _lvlBox('S0',                    s0Val, bucket === 'S0'              ? 'lvl-exit' : 'lvl-inactive');
-  const s1Box   = _lvlBox(isHiMom ? 'HM S1' : 'S1', s1Val, bucket === 'S1'           ? 'lvl-exit' : 'lvl-inactive');
-  const eodBox  = _lvlBox('EOD',                   '—',   ['EOD','MANUAL'].includes(bucket) ? 'lvl-exit' : 'lvl-inactive');
+  const cellCls = hit => hit ? 'lvl-td lc-exit' : 'lvl-td lc-def';
+  const bucketLabel = { T1: 'T1', T0: 'T0', S0: 'S0', S1: isHiMom ? 'HM S1' : 'S1',
+                        EOD: 'EOD', MANUAL: 'Manual' }[bucket] || (trade.exit_type || '—');
+  const badgeCls = bucket === 'T1' || bucket === 'T0' ? 'exit-profit' : bucket === 'S0' || bucket === 'S1' ? 'exit-loss' : 'exit-eod';
 
-  return `<div class="lvl-boxes">${t1Box}${t0Box}${s0Box}${s1Box}${eodBox}</div>`;
+  return {
+    badge: `<span class="exit-badge ${badgeCls}">${bucketLabel}</span>`,
+    t1: `<td class="${cellCls(bucket === 'T1')}">${t1Val}</td>`,
+    t0: `<td class="${cellCls(bucket === 'T0')}">${t0Val}</td>`,
+    s0: `<td class="${cellCls(bucket === 'S0')}">${s0Val}</td>`,
+    s1: `<td class="${cellCls(bucket === 'S1')}">${s1Val}</td>`,
+  };
 }
 
 function renderHistLive() {
@@ -2187,8 +2201,15 @@ function renderTrades(trades) {
     const scaleBadge = isScaled ? '<span class="scale-badge">×</span>' : '';
     const retryBadge = t._attempts > 1
       ? `<span style="font-size:10px;font-weight:700;color:#b45309;margin-left:4px" title="${t._attempts} entry attempts before this outcome">↻${t._attempts}</span>` : '';
-    const exitCell = isPviClosed ? pviClosedLevels(t)
-      : (isNoFill ? `<span class="exit-badge" style="background:#444;color:#bbb">NEVER FILLED</span>` : exitBadge(t.exit_type, meta));
+    const blankLvl = '<td class="lvl-td lc-def">—</td>';
+    let exitCell, t1Cell, t0Cell, s0Cell, s1Cell;
+    if (isPviClosed) {
+      const lv = pviClosedLevels(t);
+      exitCell = lv.badge; t1Cell = lv.t1; t0Cell = lv.t0; s0Cell = lv.s0; s1Cell = lv.s1;
+    } else {
+      exitCell = isNoFill ? `<span class="exit-badge" style="background:#444;color:#bbb">NEVER FILLED</span>` : exitBadge(t.exit_type, meta);
+      t1Cell = t0Cell = s0Cell = s1Cell = blankLvl;
+    }
     allRows.push(`<tr class="row${isScaled ? ' capital-scaled' : ''}${isNoFill ? ' row-no-fill' : ''}" data-tdk="${tdk2}"${isNoFill ? ' style="opacity:.55"' : ''}>
       <td>${dateCell}</td>
       <td><strong>${t.symbol || '—'}</strong>${scaleBadge}${retryBadge}</td>
@@ -2201,10 +2222,11 @@ function renderTrades(trades) {
       <td class="${netCls}" style="font-weight:700">${net}</td>
       <td>${exitCell}</td>
       <td style="color:var(--g)">${capTxt}</td>
+      ${t1Cell}${t0Cell}${s0Cell}${s1Cell}
     </tr>`);
     if (isPviClosed) {
       allRows.push(`<tr class="fm-detail-row" id="fmdet-c-${tdk2}" style="display:none">
-        <td colspan="11"><div class="fm-detail-inner" id="fmdet-c-inner-${tdk2}"><div style="color:#bbb;font-size:11px">Loading…</div></div></td>
+        <td colspan="15"><div class="fm-detail-inner" id="fmdet-c-inner-${tdk2}"><div style="color:#bbb;font-size:11px">Loading…</div></div></td>
       </tr>`);
     }
   });
