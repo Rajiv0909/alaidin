@@ -787,7 +787,15 @@ let _livePositions    = [];       // cache for live view in history
 let _closedTrades     = [];       // cache for timeline re-render on tile click
 let _fmLatest         = {};       // latest FM cycle per symbol {symbol: {lock_pct,ceil_pct,mfe_pct,stance}}
 let _fmEodLatest      = {};       // latest PVI_EOD FM decision per symbol {symbol: {trail_retrace_pct,take_profit_pct,loss_ceiling_pct,mfe_pct,...}}
-let _entryShadowLatest = {};      // ESC-vs-tranche entry comparison per symbol {symbol: {esc_entry_price,tranche_entry_price}}
+let _entryShadowLatest = {};      // ESC-vs-tranche entry comparison, keyed "symbol|trade_date" {esc_entry_price,tranche_entry_price}
+
+// pvi_entry_tranche_shadow is logged per trade_date, not just "today" — build the same
+// compound key the backend returns so a closed trade from any prior day still resolves,
+// not just ones that happen to fall on the current calendar day.
+function _entryShadowKey(symbol, dateStr) { return `${symbol}|${dateStr}`; }
+function _istDateStr(d) {
+  return new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // en-CA = YYYY-MM-DD
+}
 const _tradeRows      = {};       // data-tdk → trade object (avoids JSON in onclick attrs)
 let _pnlData          = null;
 let _equityChart      = null;
@@ -1823,9 +1831,10 @@ function renderHistLive() {
     rows.push(`<tr class="row ${rowCls}${isScaled ? ' capital-scaled' : ''}" data-tdk="${tdk}" data-sym="${p.symbol}" data-sid="${p.strategy_id}">
       <td><strong>${p.symbol || '—'}</strong>${scaleBadge}${entryTime ? `<br><span style="font-size:10px;color:#bbb;font-weight:400">${entryTime}</span>` : ''}</td>
       <td style="color:var(--g);font-size:12px;background:${dir.toLowerCase() === 'long' ? 'rgba(22,163,74,.10)' : dir.toLowerCase() === 'short' ? 'rgba(220,38,38,.10)' : 'transparent'}" title="${dir}">${fmtStratName(p.strategy_id)}${isPviEod ? ' <span style="font-size:9px;font-weight:700;padding:1px 4px;background:rgba(245,158,11,.15);color:#92400e;border-radius:2px;border:1px solid #fde68a">EOD</span>' : ''}</td>
-      <td>₹${isPvi && _entryShadowLatest[p.symbol]
-        ? fmtEntryPair(_entryShadowLatest[p.symbol].esc_entry_price, _entryShadowLatest[p.symbol].tranche_entry_price)
-        : fmtNum(p.entry_price)}</td>
+      <td>₹${(() => {
+        const esRow = isPvi && p.entry_time ? _entryShadowLatest[_entryShadowKey(p.symbol, _istDateStr(p.entry_time))] : null;
+        return esRow ? fmtEntryPair(esRow.esc_entry_price, esRow.tranche_entry_price) : fmtNum(p.entry_price);
+      })()}</td>
       <td class="${unrlCls}" style="font-weight:700">${unrlTxt}</td>
       <td>${mfeTxt}</td>
       <td style="color:var(--g)">${capTxt}${investedTxt}</td>
@@ -2150,7 +2159,8 @@ function renderTrades(trades) {
       ? `<span style="font-size:10px;font-weight:400;opacity:.8"> (${t.pnl_pct>=0?'+':''}${Number(t.pnl_pct).toFixed(2)}%)</span>` : '';
     const netCls= isNoFill ? '' : (t.net_pnl_rs   != null ? (t.net_pnl_rs >= 0 ? 'green' : 'red') : '');
     const dir   = t.direction || '';
-    const entryShadow = isPviClosed ? _entryShadowLatest[t.symbol] : null;
+    const tDateStr = t.trade_date || (t.entry_time ? _istDateStr(t.entry_time) : null);
+    const entryShadow = (isPviClosed && tDateStr) ? _entryShadowLatest[_entryShadowKey(t.symbol, tDateStr)] : null;
     const ep    = entryShadow
       ? '₹' + fmtEntryPair(entryShadow.esc_entry_price, entryShadow.tranche_entry_price)
       : (t.entry_price ? '₹' + fmtNum(t.entry_price) : '—');
