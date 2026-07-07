@@ -1722,6 +1722,11 @@ function renderHistLive() {
                      (meta.presignal_scale    != null && meta.presignal_scale    !== 1.0);
     const capTxt  = p.capital_deployed ? fmtK(p.capital_deployed) : '—';
     const scaleBadge = isScaled ? '<span class="scale-badge">×</span>' : '';
+    const isRound2 = meta.round != null;
+    const r2Bg    = isRound2 ? 'rgba(245,158,11,.14)' : 'transparent';
+    const r2Badge = isRound2
+      ? `<span style="font-size:9px;font-weight:800;padding:1px 5px;margin-left:4px;border-radius:3px;background:#f0a500;color:#fff;letter-spacing:.3px" title="Round-2 recovery re-entry off a source stop-out (${meta.source_pnl_pct!=null?meta.source_pnl_pct.toFixed(2)+'%':'—'}) — shadow, no real capital">R2</span>`
+      : '';
     const isShadow = (p.metadata?.shadow || (p.strategy_id||'').includes('SHADOW'));
     const isPviEod = p.strategy_id === 'PVI_EOD';
     // Actual invested vs system-intended capital_deployed — same ELEVATED
@@ -1829,7 +1834,7 @@ function renderHistLive() {
     }
 
     rows.push(`<tr class="row ${rowCls}${isScaled ? ' capital-scaled' : ''}" data-tdk="${tdk}" data-sym="${p.symbol}" data-sid="${p.strategy_id}">
-      <td><strong>${p.symbol || '—'}</strong>${scaleBadge}${entryTime ? `<br><span style="font-size:10px;color:#bbb;font-weight:400">${entryTime}</span>` : ''}</td>
+      <td style="background:${r2Bg}"><strong>${p.symbol || '—'}</strong>${scaleBadge}${r2Badge}${entryTime ? `<br><span style="font-size:10px;color:#bbb;font-weight:400">${entryTime}</span>` : ''}</td>
       <td style="color:var(--g);font-size:12px;background:${dir.toLowerCase() === 'long' ? 'rgba(22,163,74,.10)' : dir.toLowerCase() === 'short' ? 'rgba(220,38,38,.10)' : 'transparent'}" title="${dir}">${fmtStratName(p.strategy_id)}${isPviEod ? ' <span style="font-size:9px;font-weight:700;padding:1px 4px;background:rgba(245,158,11,.15);color:#92400e;border-radius:2px;border:1px solid #fde68a">EOD</span>' : ''}</td>
       <td>₹${(() => {
         const esRow = isPvi && p.entry_time ? _entryShadowLatest[_entryShadowKey(p.symbol, _istDateStr(p.entry_time))] : null;
@@ -2120,6 +2125,27 @@ async function refreshHistory() {
   renderTrades(trades);
 }
 
+// Round-2+ recovery trades all carry metadata.round === 2 regardless of how many
+// times they actually fired for the same source stop-out (a mid-day service restart
+// can re-fire the same source more than once — see project_pvi_shadow_kitesync_fake_trades
+// memory, confirmed on AZAD + SHAREINDIA 2026-07-07). Label each occurrence by its
+// chronological order per source_trade_id: 1st = R2, 2nd = R3, etc.
+function _round2Labels(trades) {
+  const bySource = {};
+  trades.forEach(t => {
+    const src = t.metadata && t.metadata.source_trade_id;
+    if (src && t.metadata && t.metadata.round != null) {
+      (bySource[src] = bySource[src] || []).push(t);
+    }
+  });
+  const labels = {};
+  Object.values(bySource).forEach(arr => {
+    arr.sort((a, b) => new Date(a.entry_time) - new Date(b.entry_time));
+    arr.forEach((t, i) => { labels[t.id] = 'R' + (i + 2); });
+  });
+  return labels;
+}
+
 function renderTrades(trades) {
   trades = _collapseRetries(trades);
   const tbody = document.getElementById('hist-body');
@@ -2132,6 +2158,7 @@ function renderTrades(trades) {
   }
   empty.style.display = 'none';
 
+  const round2Labels = _round2Labels(trades);
   let seq2 = Date.now() + 100000;
   const allRows = [];
   trades.forEach((t, i) => {
@@ -2172,6 +2199,11 @@ function renderTrades(trades) {
     const scaleBadge = isScaled ? '<span class="scale-badge">×</span>' : '';
     const retryBadge = t._attempts > 1
       ? `<span style="font-size:10px;font-weight:700;color:#b45309;margin-left:4px" title="${t._attempts} entry attempts before this outcome">↻${t._attempts}</span>` : '';
+    const r2Label = round2Labels[t.id];
+    const r2Bg    = r2Label ? (r2Label === 'R2' ? 'rgba(245,158,11,.14)' : 'rgba(194,65,12,.16)') : 'transparent';
+    const r2Badge = r2Label
+      ? `<span style="font-size:9px;font-weight:800;padding:1px 5px;margin-left:4px;border-radius:3px;background:${r2Label==='R2'?'#f0a500':'#c2410c'};color:#fff;letter-spacing:.3px" title="Round-2 recovery re-entry off a source stop-out (${meta.source_pnl_pct!=null?meta.source_pnl_pct.toFixed(2)+'%':'—'}) — shadow, no real capital">${r2Label}</span>`
+      : '';
     const blankLvl = '<td class="lvl-td lc-def">—</td>';
     let t1Cell, t0Cell, s0Cell, s1Cell;
     if (isPviClosed) {
@@ -2183,7 +2215,7 @@ function renderTrades(trades) {
     const dirBg = dir.toLowerCase() === 'long' ? 'rgba(22,163,74,.10)' : dir.toLowerCase() === 'short' ? 'rgba(220,38,38,.10)' : 'transparent';
     allRows.push(`<tr class="row${isScaled ? ' capital-scaled' : ''}${isNoFill ? ' row-no-fill' : ''}" data-tdk="${tdk2}"${isNoFill ? ' style="opacity:.55"' : ''}>
       <td>${dateCell}</td>
-      <td><strong>${t.symbol || '—'}</strong>${scaleBadge}${retryBadge}</td>
+      <td style="background:${r2Bg}"><strong>${t.symbol || '—'}</strong>${scaleBadge}${retryBadge}${r2Badge}</td>
       <td style="color:var(--g);font-size:12px;background:${dirBg}" title="${dir}">${fmtStratName(t.strategy_id)}</td>
       <td>${ep}</td>
       <td>${xp}</td>
