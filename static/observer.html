@@ -2,274 +2,274 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alaidin — Observer Login</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Alaidin — Observer Access</title>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@800;900&display=swap" rel="stylesheet">
 <style>
-:root { --k:#111111; --y:#F5C518; --g:#666666; --r:#ef4444; --b:#2563eb; }
-* { box-sizing:border-box; margin:0; padding:0; }
-body {
-  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  background:#f8f8f6;
-  min-height:100vh;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-}
-.card {
-  background:#fff;
-  border:2px solid var(--k);
-  border-radius:4px;
-  width:380px;
-  padding:40px 36px;
-}
-.logo {
-  font-family:'Nunito',system-ui,sans-serif;
-  font-size:22px;
-  font-weight:900;
-  letter-spacing:-0.5px;
-  margin-bottom:4px;
-  text-align:center;
-}
-.logo span { color:var(--y); }
-.tagline {
-  text-align:center;
-  font-size:11px;
-  font-weight:700;
-  text-transform:uppercase;
-  letter-spacing:2px;
-  color:var(--g);
-  margin-bottom:28px;
-}
-h1 {
-  font-size:21px;
-  font-weight:800;
-  letter-spacing:-0.8px;
-  margin-bottom:8px;
-}
-.sub {
-  font-size:14px;
-  color:var(--g);
-  line-height:1.65;
-  margin-bottom:28px;
-}
-.field { margin-bottom:16px; }
-label { display:block; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--g); margin-bottom:6px; }
-input[type=email], input[type=text] {
-  width:100%;
-  padding:12px 14px;
-  border:1.5px solid #ddd;
-  border-radius:3px;
-  font-size:15px;
-  outline:none;
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--y:#F5C518;--k:#111;--g:#666;--w:#fff;--cream:#FAFAF8;--hair:#e8e8e8;--warm-line:#e8e0d8;--pos:#16a34a;--neg:#dc2626}
+
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif;background:var(--w);color:var(--k)}
+.shell{display:flex;flex-direction:column;height:100vh;overflow:hidden;background:var(--w)}
+
+/* ── NAV ── */
+nav{display:flex;align-items:center;justify-content:space-between;padding:12px 36px;border-bottom:2px solid var(--k);flex-shrink:0;background:var(--cream)}
+.brand-link{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--k)}
+.brand-link img{height:38px;width:auto;display:block}
+.surface{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:3px;color:var(--g);padding-left:10px;border-left:1px solid var(--hair)}
+.nav-right{display:flex;align-items:center;gap:20px}
+.nav-tag{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:var(--g)}
+.nav-back{font-size:11px;font-weight:700;color:var(--g);text-decoration:none;letter-spacing:.3px;transition:color .15s}
+.nav-back:hover{color:var(--k)}
+
+/* ── HERO ── */
+.hero{text-align:center;padding:18px 20px 14px;flex-shrink:0;background:var(--w)}
+.hero-eyebrow{display:inline-block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:2.5px;background:var(--k);color:var(--w);padding:4px 14px;border-radius:2px;margin-bottom:10px}
+.hero h1{font-family:'Nunito',system-ui;font-size:clamp(22px,2.4vw,36px);font-weight:900;letter-spacing:-1.2px;line-height:1.05;margin-bottom:6px}
+.hero-sub{font-size:13px;color:var(--g);max-width:520px;margin:0 auto;line-height:1.55}
+
+/* ── ART + PANEL ROW ── */
+.art-wrap{flex:1;display:flex;background:var(--cream);overflow:hidden;min-height:0}
+.art-inner{flex:1;min-width:0;padding:20px 36px 10px;display:flex;flex-direction:column;overflow:hidden}
+.art-svg{width:100%;flex:1;min-height:0;display:block;object-fit:contain;object-position:center top}
+.art-cap{font-size:9px;text-transform:uppercase;letter-spacing:2.5px;color:#ccc;margin-bottom:8px;flex-shrink:0;text-align:center}
+
+/* ── LOGIN PANEL ── */
+.login-panel{width:360px;flex-shrink:0;background:var(--cream);border-left:1px solid var(--warm-line);padding:20px 24px;display:flex;flex-direction:column;gap:0;overflow-y:auto}
+
+/* ── STEP RAIL ── */
+.step-rail{display:flex;align-items:center;margin-bottom:16px;flex-shrink:0}
+.step-dot{width:22px;height:22px;border-radius:50%;border:2px solid var(--hair);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#bbb;flex-shrink:0;transition:background .15s,border-color .15s,color .15s}
+.step-dot.active{background:var(--y);border-color:var(--y);color:var(--k)}
+.step-dot.done{background:var(--k);border-color:var(--k);color:var(--w)}
+.step-line{flex:1;height:1px;background:var(--hair);margin:0 5px;transition:background .15s}
+.step-line.done{background:var(--k)}
+
+/* ── PANEL TYPOGRAPHY ── */
+.panel-step{display:none;flex-direction:column;gap:10px;flex:1;min-height:0}
+.panel-step.on{display:flex}
+.panel-title{font-size:20px;font-weight:900;letter-spacing:-0.6px;color:var(--k);flex-shrink:0}
+.panel-sub{font-size:12px;color:var(--g);line-height:1.55;flex-shrink:0}
+.panel-note{font-size:10px;color:#bbb;text-align:center;flex-shrink:0}
+
+/* ── INPUTS ── */
+.field{display:flex;flex-direction:column;gap:5px;flex-shrink:0}
+.field label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:var(--g)}
+input[type=email],input[type=text]{
+  width:100%;padding:12px 13px;
+  border:2px solid var(--hair);border-radius:3px;
+  font-size:14px;font-family:inherit;outline:none;background:var(--w);
   transition:border-color .15s;
 }
-input:focus { border-color:var(--k); }
-.otp-input {
-  letter-spacing:8px;
-  font-size:22px;
-  font-weight:700;
-  text-align:center;
+input:focus{border-color:var(--k);}
+.otp-input{letter-spacing:10px;font-size:22px;font-weight:700;text-align:center;}
+
+/* ── BUTTONS ── */
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:13px 14px;border-radius:3px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;text-decoration:none;border:2px solid transparent;transition:background .12s,border-color .12s,color .12s;flex-shrink:0}
+.btn-yellow{background:var(--y);border-color:var(--y);color:var(--k)}
+.btn-yellow:hover{background:var(--k);border-color:var(--k);color:var(--w)}
+.btn-outline{background:var(--cream);border-color:var(--k);color:var(--k)}
+.btn-outline:hover{background:#ede8e0}
+.btn-ghost{background:transparent;border-color:#ddd;color:var(--g);font-size:12px;padding:8px 14px}
+.btn-ghost:hover{border-color:#bbb;color:var(--k)}
+.btn:disabled{opacity:.35;cursor:not-allowed;pointer-events:none}
+
+/* ── ALERTS ── */
+.alert{padding:10px 13px;border-radius:2px;font-size:12px;flex-shrink:0;display:none}
+.alert-error{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+.alert-success{background:#dcfce7;color:#166534;border:1px solid #86efac}
+
+.resend{text-align:center;font-size:11px;color:var(--g);flex-shrink:0}
+.resend a{color:var(--k);font-weight:800;cursor:pointer;text-decoration:underline}
+
+/* ── TRUST STRIP ── */
+.trust-strip{display:flex;justify-content:space-around;padding:14px 20px;border-top:2px solid var(--k);flex-shrink:0}
+.trust-item{display:flex;flex-direction:column;align-items:center;gap:3px}
+.trust-val{font-size:16px;font-weight:900;letter-spacing:-0.5px}
+.trust-lbl{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:var(--g)}
+
+@media(max-width:800px){
+  .art-inner{display:none}
+  .login-panel{width:100%;border-left:none}
+  .hero h1{font-size:24px}
 }
-.btn {
-  width:100%;
-  padding:13px;
-  background:var(--k);
-  color:#fff;
-  border:none;
-  border-radius:3px;
-  font-size:15px;
-  font-weight:700;
-  cursor:pointer;
-  transition:opacity .15s;
+@media(max-width:480px){
+  nav{padding:10px 18px}
+  .login-panel{padding:16px 18px}
+  .hero{padding:14px 16px 10px}
 }
-.btn:hover { opacity:.85; }
-.btn:disabled { opacity:.45; cursor:not-allowed; }
-.btn-ghost {
-  background:none;
-  color:var(--g);
-  border:1.5px solid #ddd;
-  margin-top:10px;
-}
-.btn-ghost:hover { border-color:var(--k); color:var(--k); opacity:1; }
-.alert {
-  padding:10px 14px;
-  border-radius:3px;
-  font-size:13px;
-  margin-bottom:16px;
-  display:none;
-}
-.alert-error   { background:#fee2e2; color:#991b1b; }
-.alert-success { background:#dcfce7; color:#166534; }
-.resend {
-  text-align:center;
-  font-size:12px;
-  color:var(--g);
-  margin-top:14px;
-}
-.resend a { color:var(--k); font-weight:700; cursor:pointer; text-decoration:underline; }
-.note {
-  text-align:center;
-  font-size:12px;
-  color:#bbb;
-  line-height:1.7;
-  margin-top:20px;
-}
-.note a { color:var(--g); text-decoration:underline; }
 </style>
 </head>
 <body>
-<div class="card">
-  <div class="logo"><span>ala</span>idin</div>
-  <div class="tagline">Observer Access</div>
+<div class="shell">
 
-  <!-- Panel 1: Email entry -->
-  <div id="panel-email">
-    <h1>Watch live strategies.</h1>
-    <p class="sub">Enter your email to get a one-time login code. No broker account needed.</p>
-    <div class="alert alert-error" id="email-error"></div>
-    <div class="field">
-      <label>Email address</label>
-      <input type="email" id="email-input" placeholder="you@example.com" autocomplete="email">
+  <nav>
+    <a href="/" class="brand-link">
+      <img src="/static/assets/alaidin-logo-cropped.png" alt="alaidin">
+      <span class="surface">Buddies</span>
+    </a>
+    <div class="nav-right">
+      <a href="/subscribe" class="nav-back">← Sign in with broker</a>
+      <span class="nav-tag">Friends &amp; Family</span>
     </div>
-    <button class="btn" id="btn-send" onclick="sendOtp()">Send login code</button>
-    <p class="note">Already have an account? <a href="/subscribe">Subscribe to copy trades →</a></p>
+  </nav>
+
+  <div class="hero">
+    <div class="hero-eyebrow">Observer Access</div>
+    <h1>Watch strategies live.</h1>
+    <p class="hero-sub">No broker account needed. Enter your email and we'll send you a one-time login code.</p>
   </div>
 
-  <!-- Panel 2: OTP entry -->
-  <div id="panel-otp" style="display:none">
-    <h1>Check your inbox.</h1>
-    <p class="sub" id="otp-sub">We sent a 6-digit code to <strong id="otp-email-label"></strong>.</p>
-    <div class="alert alert-error" id="otp-error"></div>
-    <div class="alert alert-success" id="otp-success"></div>
-    <div class="field">
-      <label>Login code</label>
-      <input type="text" id="otp-input" class="otp-input" placeholder="000000" maxlength="6"
-        inputmode="numeric" autocomplete="one-time-code" onkeydown="otpKeydown(event)">
+  <div class="art-wrap">
+
+    <div class="art-inner">
+      <p class="art-cap">Alaidin &amp; the daily table — friends &amp; family edition</p>
+      <img src="/static/assets/last-supper.svg" class="art-svg" alt="Alaidin — the daily table">
+      <div class="trust-strip">
+        <div class="trust-item"><div class="trust-val" id="t-trades">—</div><div class="trust-lbl">Total Trades</div></div>
+        <div class="trust-item"><div class="trust-val" id="t-strats">—</div><div class="trust-lbl">Strategies</div></div>
+        <div class="trust-item"><div class="trust-val">NSE</div><div class="trust-lbl">Exchange</div></div>
+      </div>
     </div>
-    <button class="btn" id="btn-verify" onclick="verifyOtp()">Verify →</button>
-    <button class="btn btn-ghost" onclick="goBack()">← Use a different email</button>
-    <div class="resend">Didn't get it? <a onclick="resend()">Resend code</a></div>
-  </div>
-</div>
+
+    <div class="login-panel">
+      <div class="step-rail">
+        <div class="step-dot active" id="sd1">1</div>
+        <div class="step-line" id="sl1"></div>
+        <div class="step-dot inactive" id="sd2">2</div>
+      </div>
+
+      <!-- Step 1: email -->
+      <div class="panel-step on" id="panel-email">
+        <div class="panel-title">Get a link.</div>
+        <div class="panel-sub">We'll email you a 6-digit code — good for one session.</div>
+        <div class="alert alert-error" id="email-error"></div>
+        <div class="field">
+          <label>Email address</label>
+          <input type="email" id="email-input" placeholder="you@example.com" autocomplete="email">
+        </div>
+        <button class="btn btn-yellow" id="btn-send" onclick="sendOtp()">Send login code →</button>
+        <div class="panel-note">Want to copy trades? <a href="/subscribe" style="color:var(--g)">Subscribe as a member →</a></div>
+      </div>
+
+      <!-- Step 2: OTP -->
+      <div class="panel-step" id="panel-otp">
+        <div class="panel-title">Check your inbox.</div>
+        <div class="panel-sub">We sent a 6-digit code to <strong id="otp-email-label"></strong>.</div>
+        <div class="alert alert-error" id="otp-error"></div>
+        <div class="alert alert-success" id="otp-success"></div>
+        <div class="field">
+          <label>Login code</label>
+          <input type="text" id="otp-input" class="otp-input" placeholder="000000" maxlength="6"
+            inputmode="numeric" autocomplete="one-time-code" onkeydown="otpKeydown(event)">
+        </div>
+        <button class="btn btn-yellow" id="btn-verify" onclick="verifyOtp()">Verify →</button>
+        <button class="btn btn-ghost" onclick="goBack()">← Use a different email</button>
+        <div class="resend">Didn't get it? <a onclick="resend()">Resend code</a></div>
+      </div>
+
+    </div><!-- /login-panel -->
+  </div><!-- /art-wrap -->
+
+</div><!-- /shell -->
 
 <script>
 const API = window.location.origin;
 let _email = '';
 
-function showError(id, msg) {
-  const el = document.getElementById(id);
-  el.textContent = msg;
-  el.style.display = msg ? 'block' : 'none';
-}
-function showSuccess(id, msg) {
-  const el = document.getElementById(id);
-  el.textContent = msg;
-  el.style.display = msg ? 'block' : 'none';
+function show(id) { document.getElementById(id).style.display = 'block'; }
+function hide(id) { document.getElementById(id).style.display = 'none'; }
+function showError(id, msg) { const el = document.getElementById(id); el.textContent = msg; el.style.display = msg ? 'block' : 'none'; }
+function showSuccess(id, msg) { const el = document.getElementById(id); el.textContent = msg; el.style.display = msg ? 'block' : 'none'; }
+
+function setStep(n) {
+  document.getElementById('sd1').className = 'step-dot ' + (n > 1 ? 'done' : 'active');
+  document.getElementById('sd1').textContent = n > 1 ? '✓' : '1';
+  document.getElementById('sl1').className = 'step-line' + (n > 1 ? ' done' : '');
+  document.getElementById('sd2').className = 'step-dot ' + (n === 2 ? 'active' : 'inactive');
+  document.getElementById('panel-email').classList.toggle('on', n === 1);
+  document.getElementById('panel-otp').classList.toggle('on', n === 2);
 }
 
 async function sendOtp() {
-  const emailEl = document.getElementById('email-input');
-  const email = emailEl.value.trim().toLowerCase();
-  if (!email || !/^[^@]+@[^@]+\.[^@]+$/.test(email)) {
-    showError('email-error', 'Enter a valid email address.');
-    return;
-  }
+  const email = document.getElementById('email-input').value.trim().toLowerCase();
+  if (!email || !/^[^@]+@[^@]+\.[^@]+$/.test(email)) { showError('email-error', 'Enter a valid email address.'); return; }
   showError('email-error', '');
-  document.getElementById('btn-send').disabled = true;
-  document.getElementById('btn-send').textContent = 'Sending…';
-
+  const btn = document.getElementById('btn-send');
+  btn.disabled = true; btn.textContent = 'Sending…';
   try {
     const r = await fetch(`${API}/api/observer/request-otp`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({email}),
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email})
     });
     const d = await r.json();
     if (d.error) throw new Error(d.error);
-
     _email = email;
     document.getElementById('otp-email-label').textContent = email;
-    document.getElementById('panel-email').style.display = 'none';
-    document.getElementById('panel-otp').style.display = 'block';
+    setStep(2);
     document.getElementById('otp-input').focus();
-
-    // Dev mode: pre-fill OTP
-    if (d.dev_otp) {
-      document.getElementById('otp-input').value = d.dev_otp;
-      showSuccess('otp-success', `Dev mode: code is ${d.dev_otp}`);
-    }
+    if (d.dev_otp) { document.getElementById('otp-input').value = d.dev_otp; showSuccess('otp-success', `Dev mode: code is ${d.dev_otp}`); }
   } catch(e) {
     showError('email-error', e.message || 'Failed to send code. Try again.');
   } finally {
-    document.getElementById('btn-send').disabled = false;
-    document.getElementById('btn-send').textContent = 'Send login code';
+    btn.disabled = false; btn.textContent = 'Send login code →';
   }
 }
 
 async function verifyOtp() {
   const otp = document.getElementById('otp-input').value.trim();
-  if (otp.length !== 6) {
-    showError('otp-error', 'Enter the 6-digit code from your email.');
-    return;
-  }
+  if (otp.length !== 6) { showError('otp-error', 'Enter the 6-digit code from your email.'); return; }
   showError('otp-error', '');
-  document.getElementById('btn-verify').disabled = true;
-  document.getElementById('btn-verify').textContent = 'Verifying…';
-
+  const btn = document.getElementById('btn-verify');
+  btn.disabled = true; btn.textContent = 'Verifying…';
   try {
     const r = await fetch(`${API}/api/observer/verify-otp`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({email: _email, otp}),
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email:_email, otp})
     });
     const d = await r.json();
     if (d.error) throw new Error(d.error);
     window.location.href = '/dashboard?view=observe';
   } catch(e) {
     showError('otp-error', e.message || 'Invalid code. Try again.');
-    document.getElementById('btn-verify').disabled = false;
-    document.getElementById('btn-verify').textContent = 'Verify →';
+    btn.disabled = false; btn.textContent = 'Verify →';
   }
 }
 
 async function resend() {
-  showError('otp-error', '');
-  showSuccess('otp-success', '');
+  showError('otp-error', ''); showSuccess('otp-success', '');
   document.getElementById('otp-input').value = '';
   try {
     const r = await fetch(`${API}/api/observer/request-otp`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({email: _email}),
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email:_email})
     });
     const d = await r.json();
     if (d.error) throw new Error(d.error);
     showSuccess('otp-success', 'New code sent!');
-    if (d.dev_otp) {
-      document.getElementById('otp-input').value = d.dev_otp;
-      showSuccess('otp-success', `Dev mode: code is ${d.dev_otp}`);
-    }
-  } catch(e) {
-    showError('otp-error', e.message || 'Failed to resend. Try again.');
-  }
+    if (d.dev_otp) { document.getElementById('otp-input').value = d.dev_otp; showSuccess('otp-success', `Dev mode: code is ${d.dev_otp}`); }
+  } catch(e) { showError('otp-error', e.message || 'Failed to resend. Try again.'); }
 }
 
 function goBack() {
-  document.getElementById('panel-otp').style.display = 'none';
-  document.getElementById('panel-email').style.display = 'block';
+  setStep(1);
   document.getElementById('otp-input').value = '';
   showError('otp-error', '');
 }
 
-function otpKeydown(e) {
-  if (e.key === 'Enter') verifyOtp();
+function otpKeydown(e) { if (e.key === 'Enter') verifyOtp(); }
+
+async function loadStats() {
+  try {
+    const r = await fetch(`${API}/api/strategies/live-stats`);
+    const d = await r.json();
+    const strats = Object.values(d);
+    const totalT = strats.reduce((a, s) => a + (s.trades || 0), 0);
+    if (totalT > 0) document.getElementById('t-trades').textContent = totalT.toLocaleString('en-IN');
+    if (strats.length) document.getElementById('t-strats').textContent = strats.length;
+  } catch(_) {}
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('email-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') sendOtp();
-  });
+  document.getElementById('email-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendOtp(); });
+  loadStats();
 });
 </script>
 </body>

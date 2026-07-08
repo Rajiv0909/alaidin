@@ -740,8 +740,8 @@
                 <h1 class="logo-hero-black">
                     <span class="thin">al</span><span class="bold">a</span><span class="thin">d</span><span class="bold">i</span><span class="thin">n</span>
                 </h1>
-                <div class="header-content">
-                    Advanced Logic & Analysis Dashboard for Investment Navigation
+                <div class="header-tagline">
+                    Advanced Logic &amp; Analysis Dashboard for Investment Navigation
                 </div>
                 <div class="header-status">
                     <span id="system-status" class="status-indicator">●</span>
@@ -808,7 +808,7 @@
                 <div id="chart-container" class="chart-content" style="display: none;">
                     <div id="price-chart-wrapper">
                             <div class="chart-header">
-                                <h3 class="chart-title" id="dynamic-chart-title">${symbol} Price Chart (${this.currentDisplayDays} days)</h3>
+                                <h3 class="chart-title" id="dynamic-chart-title">Price Chart</h3>
                                 <div class="chart-controls">
                                     <select id="timeframe-selector">
                                         <option value="7">1 Week</option>
@@ -1398,20 +1398,23 @@
         }
 
         calculateChartPeriod() {
-            if (!this.analysisData) return;
-            
+            if (!this.analysisData) {
+                this.chartDisplayDays = this.currentTimeframe;
+                return;
+            }
+
             // Calculate analysis period from data points
             const dataPoints = this.analysisData.data_points_analyzed || 180;
             this.analysisPeriodDays = Math.ceil(dataPoints / 1.4); // Trading to calendar days
-            
+
             // Calculate projection period
             const targetTimeframe = this.analysisData.target_timeframe || '1_month';
             this.projectionDays = this.parseTimeframeToDays(targetTimeframe);
-            
-            // Total chart period
-            this.currentTimeframe = this.analysisPeriodDays + this.projectionDays;
-            
-            console.log(`Chart period: ${this.analysisPeriodDays} analysis + ${this.projectionDays} projection = ${this.currentTimeframe} days`);
+
+            // Total chart period (separate from user-selected currentTimeframe)
+            this.chartDisplayDays = this.analysisPeriodDays + this.projectionDays;
+
+            console.log(`Chart period: ${this.analysisPeriodDays} analysis + ${this.projectionDays} projection = ${this.chartDisplayDays} days`);
         }
 
         parseTimeframeToDays(timeframe) {
